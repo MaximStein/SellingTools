@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+
+<TableView fx:id="ordersTable" editable="true" maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" xmlns="http://javafx.com/javafx/15.0.1" xmlns:fx="http://javafx.com/fxml/1">
+  <columns>
+      <TableColumn fx:id="selectionCol" prefWidth="75.0" text="Auswahl" />
+    <TableColumn fx:id="orderNumberCol" prefWidth="130.0" text="Bestellnummer" />
+    <TableColumn fx:id="dateCol" prefWidth="120.0" text="Datum" />
+      <TableColumn fx:id="amountCol" prefWidth="83.0" text="Betrag" />
+      <TableColumn fx:id="marketplaceCol" prefWidth="104.0" text="Shop" />
+      <TableColumn fx:id="invoiceNrCol" prefWidth="115.0" text="Rechnung" />
+      <TableColumn fx:id="statusCol" prefWidth="92.0" text="Status" />
+  </columns>
+</TableView>

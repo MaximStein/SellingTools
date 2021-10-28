@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox prefHeight="145.0" spacing="5.0" xmlns="http://javafx.com/javafx/15.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.salesinvoicetools.controllers.AddressController">
+   <children>
+      <TextField fx:id="nameInput" promptText="Name" />
+      <TextField fx:id="streetInput" promptText="Straße &amp; Nr." />
+      <TextField fx:id="addressAdditionInput" promptText="Adresszusatz" />
+      <HBox VBox.vgrow="ALWAYS">
+         <children>
+            <TextField fx:id="zipInput" prefHeight="25.0" prefWidth="83.0" promptText="PLZ" />
+            <TextField fx:id="cityInput" alignment="TOP_LEFT" prefHeight="25.0" promptText="Ort">
+               <HBox.margin>
+                  <Insets left="5.0" />
+               </HBox.margin>
+            </TextField>
+         </children>
+      </HBox>
+      <TextField fx:id="countryInput" promptText="Land" />
+   </children>
+</VBox>
