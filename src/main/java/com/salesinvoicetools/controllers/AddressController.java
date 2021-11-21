@@ -1,5 +1,6 @@
 package com.salesinvoicetools.controllers;
 
+import com.salesinvoicetools.utils.AppUtils;
 import javafx.fxml.FXML;
 import javafx.scene.control.TextField;
 import com.salesinvoicetools.models.Address;
@@ -35,7 +36,7 @@ public class AddressController {
 		streetInput.setText(a.getStreet());
 		zipInput.setText(a.getPostalCode());
 		cityInput.setText(a.getCity());
-		countryInput.setText(a.getCountry());
+		countryInput.setText(a.country == null ? "" : a.country.toString());
 		
 	}
 
@@ -61,7 +62,7 @@ public class AddressController {
 		a.setCity(cityInput.getText());
 		a.setAdditionalInfo(addressAdditionInput.getText());
 		a.setPostalCode(zipInput.getText());
-		a.setCountry(countryInput.getText());
+		a.country = AppUtils.parseCountry(countryInput.getText());
 		a.setStreet(streetInput.getText());
 	}
 	

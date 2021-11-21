@@ -11,24 +11,33 @@ public class ApiAccessDataAccess extends DataAccessBase {
 		
 		DataAccessBase.getAll(DataSource.class).forEach(da -> {
 			if(da.getToken() == entry)
+				System.out.println("Removing DataSource "+da.id);
 				em.remove(da);
 			});
-	
-		entry.getOwner().getTokens().remove(entry);
-		
-		em.getTransaction().commit();		
+
+		if(entry.getOwner().tokens.remove(entry)) {
+			System.out.println("removed token "+entry.id+" from ApiAccess "+entry.owner.platform);
+		}
+		else {
+			System.out.println("token "+entry.id+" not found in ApiAccess "+entry.owner.platform);
+		}
+
+		System.out.println("Removing token "+entry.id+" from DB");
+		em.remove(entry);
+		em.getTransaction().commit();
+
 	}
 
 	public static void addToken(ApiAccess parent, OAuth2Token entry) {
 		em.getTransaction().begin();
-		if(!parent.getTokens().contains(entry))
-			parent.getTokens().add(entry);		
+		if(!parent.tokens.contains(entry))
+			parent.tokens.add(entry);
 		em.getTransaction().commit();
 	}
 
 	public static void removeToken(ApiAccess parent, OAuth2Token token) {
 		em.getTransaction().begin();
-		parent.getTokens().remove(token);
+		parent.tokens.remove(token);
 		em.getTransaction().commit();
 	}
 }

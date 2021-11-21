@@ -31,6 +31,9 @@ public class OAuth2Token {
 	
 	public boolean isActive = true;
 
+
+
+
 	public boolean isActive() {
 		return isActive;
 	}

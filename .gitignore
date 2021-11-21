@@ -1,2 +1,4 @@
 # Project exclude paths
 /target/
+/app-db.mv.db
+/src/main/java/com/salesinvoicetools/Private.java

@@ -1,5 +1,7 @@
 package com.salesinvoicetools.models;
 
+import com.salesinvoicetools.shopapis.EtsyShopApi;
+
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,9 +20,7 @@ import javax.persistence.UniqueConstraint;
 @Table(uniqueConstraints = { @UniqueConstraint(columnNames = { "DATASOURCE_ID", "ORDERNUMBER" }) })
 public class ShopOrder {
 
-	public enum Marketplace {
-		EBAY_FAKE,EBAY,ETSY,OTHER
-	}
+	public ShopOrder()	{}
 
 	@Id
 	@GeneratedValue
@@ -88,7 +88,7 @@ public class ShopOrder {
 	}
 
 	public String getMarketplaceString() {
-		return dataSource == null ? "-sonstige-" : dataSource.getToken().getOwner().getPlatform().toString();
+		return dataSource == null ? "-sonstige-" : dataSource.getToken().getOwner().platform.toString();
 	}
 
 	public long getId() {

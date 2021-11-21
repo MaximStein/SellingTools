@@ -5,7 +5,7 @@ import com.salesinvoicetools.dataaccess.ApiAccessDataAccess;
 import com.salesinvoicetools.dataaccess.DataAccessBase;
 import com.salesinvoicetools.models.ApiAccess;
 import com.salesinvoicetools.models.OAuth2Token;
-import com.salesinvoicetools.models.ShopOrder.Marketplace;
+import com.salesinvoicetools.shopapis.ShopApiBase.*;
 import com.salesinvoicetools.shopapis.ShopApiBase;
 import com.salesinvoicetools.utils.AppUtils;
 import javafx.beans.value.ChangeListener;
@@ -23,6 +23,8 @@ import javafx.scene.web.WebView;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import org.controlsfx.control.NotificationPane;
+import org.controlsfx.control.Notifications;
 
 import java.io.IOException;
 import java.net.URLDecoder;
@@ -90,13 +92,11 @@ public class ApiAccessController {
 								apiEntryActiveCheckbox.setSelected(true);								
 								apiEntryActiveCheckbox.setDisable(true);
 							}
-							
-							
 						}
-
 					});
 			updateApiTreeView();
 		}
+
 		if(apiEntryActiveCheckbox != null) {
 			apiEntryActiveCheckbox.selectedProperty().addListener((ObservableValue<? extends Boolean> ov,
 					Boolean old_val, Boolean new_val) -> {
@@ -116,7 +116,7 @@ public class ApiAccessController {
 	private List<Marketplace> getUnusedApis() {
 		List<ApiAccess> apiAccesses = DataAccessBase.getAll(ApiAccess.class);
 
-		Marketplace[] savedVals = apiAccesses.stream().map(item -> item.getPlatform()).toArray(Marketplace[]::new);
+		Marketplace[] savedVals = apiAccesses.stream().map(item -> item.platform).toArray(Marketplace[]::new);
 		var allVals = Arrays.asList(Marketplace.class.getEnumConstants());
 
 		return allVals.stream().filter(item -> item != Marketplace.OTHER && !Arrays.asList(savedVals).contains(item)).collect(Collectors.toList());
@@ -129,12 +129,12 @@ public class ApiAccessController {
 	private void showAddApiModal(Window owner) {
 		try {
 			Stage stage = new Stage();
-			stage.setTitle("API-Zugang hinzuf�gen");
+			stage.setTitle("+ API-Zugang");
 			stage.initModality(Modality.WINDOW_MODAL);
 			stage.initOwner(owner);
 			Parent root;
 			root = FXMLLoader.load(AppWindow.class.getResource("AddApiModal.fxml"));
-			stage.setScene(new Scene(root, 400, 300));
+			stage.setScene(new Scene(root, 500, 400));
 			stage.showAndWait();
 			updateApiTreeView();
 		} catch (IOException e) {
@@ -145,14 +145,14 @@ public class ApiAccessController {
 	}
 
 	private void updateApiTreeView() {
-		var apiAccessRootNode = new TreeItem<Object>("API Zug�nge");
+		var apiAccessRootNode = new TreeItem<Object>("APIs");
 		apiAccessRootNode.setExpanded(true);
 
 		var apiAccessEntries = apiAccessRootNode.getChildren();
 		List<ApiAccess> items = DataAccessBase.getAll(ApiAccess.class);
 		items.stream().forEach(item -> {
 			var treeItem = new TreeItem<Object>(item);
-			item.getTokens().stream().forEach(token -> {
+			item.tokens.stream().forEach(token -> {
 				var subItem = new TreeItem<Object>(token);
 				subItem.setExpanded(true);
 				treeItem.getChildren().add(subItem);
@@ -172,7 +172,7 @@ public class ApiAccessController {
 		
 		if(item.getValue() instanceof OAuth2Token) {
 			var token = (OAuth2Token) item.getValue();
-			token.getOwner().getTokens().remove(token);
+			token.getOwner().tokens.remove(token);
 			ApiAccessDataAccess.deleteToken(token);
 			DataAccessBase.insertOrUpdate(token.getOwner());
 		}
@@ -212,7 +212,7 @@ public class ApiAccessController {
 			
 			if(result.get().length() == 0)
 			{
-				headerMessage = "Bitte das Feld ausf�llen.";
+				headerMessage = "Bitte das Feld ausfüllen.";
 				continue;
 			}	
 			else 
@@ -229,10 +229,9 @@ public class ApiAccessController {
 		while(!showWebView);
 				
 		OAuth2Token token = new OAuth2Token();
-		token.setOwner(api);
+		token.owner = api;
 		token.setName(result.orElse("Neuer Token"));
-		api.getTokens().add(token);
-					
+
 		ShopApiBase shopApi = ShopApiBase.getTargetShopApi(token);
 
 		Stage stage = new Stage();
@@ -252,22 +251,30 @@ public class ApiAccessController {
 		engine.getLoadWorker().stateProperty().addListener(new ChangeListener<State>() {
 			@Override
 			public void changed(ObservableValue<? extends State> ov, State oldState, State newState) {
+				System.out.println(engine.getLocation());
 
-				if (newState != State.SUCCEEDED)
-					return;
+
+				System.out.println("STATE SUCCEEDED");
 
 				stage.setTitle(engine.getLocation());
-				
+
 				try {
 					var code = AppUtils.getParameterVal(engine.getLocation(), "code");
 
-					System.out.println(engine.getLocation());
-					System.out.println(code);
-
-					if (code == null)
+					if (code == null) {
+						System.out.println("code not found in URL");
 						return;
-					
-					shopApi.tradeAccessTokenForCode(URLDecoder.decode(code, "UTF-8"));
+					}
+
+					if(shopApi.tradeAccessTokenForCode(URLDecoder.decode(code, "UTF-8"))) {
+						token.setOwner(api);
+						api.tokens.add(token);
+
+						DataAccessBase.insertOrUpdate(api);
+						AppUtils.showNotification("Zugang gespeichert", "API-Konto Nr. "+DataAccessBase.count(OAuth2Token.class)+" eingetragen");
+						stage.close();
+					}
+
 					updateApiTreeView();
 
 				} catch (IOException | InterruptedException | ExecutionException e) {
@@ -288,7 +295,7 @@ public class ApiAccessController {
 				clientSecretTextField.getText(), callbackUrlTextField.getText());
 		((Stage) ((Node) e.getSource()).getScene().getWindow()).close();
 
-		if (entry.getClientId().length() > 0 && entry.getClientId().length() > 0) {
+		if (entry.clientSecret.length() > 0) {
 			DataAccessBase.insertOrUpdate(entry);
 		}
 	}

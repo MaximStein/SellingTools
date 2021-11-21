@@ -1,14 +1,12 @@
 package com.salesinvoicetools.controllers;
 
+import com.github.scribejava.core.model.Token;
 import com.salesinvoicetools.AppWindow;
 import com.salesinvoicetools.dataaccess.DataAccessBase;
 import com.salesinvoicetools.dataaccess.DataUpdateDataAccess;
 import com.salesinvoicetools.dataaccess.OrderDataAccess;
 import com.salesinvoicetools.dataaccess.models.ShopOrdersFilterModel;
-import com.salesinvoicetools.models.Address;
-import com.salesinvoicetools.models.DataSource;
-import com.salesinvoicetools.models.OAuth2Token;
-import com.salesinvoicetools.models.ShopOrder;
+import com.salesinvoicetools.models.*;
 import com.salesinvoicetools.shopapis.EbayShopApi;
 import com.salesinvoicetools.shopapis.ShopApiBase;
 import com.salesinvoicetools.utils.AppUtils;
@@ -36,8 +34,12 @@ import javafx.scene.layout.*;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.Callback;
+import net.synedra.validatorfx.Check;
+import org.controlsfx.control.CheckComboBox;
+import org.controlsfx.control.PopOver;
 
 import java.io.IOException;
+import java.sql.Array;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.*;
@@ -92,14 +94,11 @@ public class OrdersController {
 	@FXML
 	private TableView<ShopOrdersTableRow> ordersTable;
 
-	@FXML
-	Label statusLabel;
 
 	@FXML
 	ProgressIndicator statusLoadingIndicator;
 
-	@FXML
-	Button apiUpdateButton;
+
 
 	@FXML
 	ProgressBar progressBar;
@@ -112,6 +111,9 @@ public class OrdersController {
 
 	@FXML
 	Pane filterContainer;
+
+	@FXML
+	ApiUpdateController apiUpdateController;
 
 	private long totalEntries;
 
@@ -161,9 +163,7 @@ public class OrdersController {
 					str += addr.getName() + "\r\n";
 				if (buyer != null)
 					str += buyer.getUserName();
-
 				return new SimpleStringProperty(str);
-
 			});
 
 			selectionCol.setCellFactory(CheckBoxTableCell.forTableColumn(selectionCol));
@@ -195,55 +195,56 @@ public class OrdersController {
 				return new SimpleStringProperty(String.join(",", str));
 			});
 
+
 			actionCol.setCellFactory(
-					new Callback<TableColumn<ShopOrdersTableRow, Void>, TableCell<ShopOrdersTableRow, Void>>() {
+				new Callback<TableColumn<ShopOrdersTableRow, Void>, TableCell<ShopOrdersTableRow, Void>>() {
 
-						@Override
-						public TableCell<ShopOrdersTableRow, Void> call(
-								final TableColumn<ShopOrdersTableRow, Void> param) {
+					@Override
+					public TableCell<ShopOrdersTableRow, Void> call(
+							final TableColumn<ShopOrdersTableRow, Void> param) {
 
-							return new TableCell<ShopOrdersTableRow, Void>() {
-								private final Button removeButton = new Button();
-								private final Button editButton = new Button();
+						return new TableCell<ShopOrdersTableRow, Void>() {
+							private final Button removeButton = new Button();
+							private final Button editButton = new Button();
 
-								private ShopOrder getData() {
-									return getTableView().getItems().get(getIndex()).order;
+							private ShopOrder getData() {
+								return getTableView().getItems().get(getIndex()).order;
+							}
+
+							private final Button invoiceButton = new Button();
+							{
+								editButton.setGraphic(new FontAwesomeIconView(FontAwesomeIcon.EDIT, "16px"));
+								editButton.setOnAction((ActionEvent e) -> {
+									showOrderDetails(getData());
+								});
+
+								removeButton.setGraphic(new FontAwesomeIconView(FontAwesomeIcon.REMOVE, "16px"));
+								removeButton.setOnAction((ActionEvent e) -> {
+									removeOrder(getData());
+								});
+
+								invoiceButton
+										.setGraphic(new FontAwesomeIconView(FontAwesomeIcon.FILE_PDF_ALT, "16px"));
+								invoiceButton.setOnAction((ActionEvent e) -> {
+									AppUtils.generateOrderInvoices(new Long[] { getData().getId() });
+									updateOrdersView();
+								});
+							}
+
+							@Override
+							public void updateItem(Void item, boolean empty) {
+								super.updateItem(item, empty);
+								if (empty) {
+									setGraphic(null);
+								} else {
+									var hbox = new HBox(editButton, removeButton, invoiceButton);
+									hbox.setSpacing(5);
+									setGraphic(hbox);
 								}
-
-								private final Button invoiceButton = new Button();
-								{
-									editButton.setGraphic(new FontAwesomeIconView(FontAwesomeIcon.EDIT, "16px"));
-									editButton.setOnAction((ActionEvent e) -> {
-										showOrderDetails(getData());
-									});
-
-									removeButton.setGraphic(new FontAwesomeIconView(FontAwesomeIcon.REMOVE, "16px"));
-									removeButton.setOnAction((ActionEvent e) -> {
-										removeOrder(getData());
-									});
-
-									invoiceButton
-											.setGraphic(new FontAwesomeIconView(FontAwesomeIcon.FILE_PDF_ALT, "16px"));
-									invoiceButton.setOnAction((ActionEvent e) -> {
-										AppUtils.generateOrderInvoices(new Long[] { getData().getId() });
-										updateOrdersView();
-									});
-								}
-
-								@Override
-								public void updateItem(Void item, boolean empty) {
-									super.updateItem(item, empty);
-									if (empty) {
-										setGraphic(null);
-									} else {
-										var hbox = new HBox(editButton, removeButton, invoiceButton);
-										hbox.setSpacing(5);
-										setGraphic(hbox);
-									}
-								}
-							};
-						}
-					});
+							}
+						};
+					}
+				});
 
 			ordersPagination.currentPageIndexProperty().addListener((obs, oldIndex, newIndex) -> {
 				filter.page = newIndex.intValue();
@@ -253,24 +254,31 @@ public class OrdersController {
 			var allTokens = DataAccessBase.getAll(OAuth2Token.class).toArray(new OAuth2Token[0]);
 			var tokenSelectOptions = Stream.concat(
 					Arrays.<OAuth2Token>stream(allTokens)
-							.map(t -> new TokenSelectModel(t, t.getName() + " | " + t.getOwner().getPlatform(), false)),
+							.map(t -> new TokenSelectModel(t, t.getName() + " | " + t.getOwner().platform, false)),
 					Arrays.stream(
 							new TokenSelectModel[] { new TokenSelectModel(null, "( ohne / manuell angelegt )", false),
 									new TokenSelectModel(null, "( alle )", true) }))
 					.toArray(TokenSelectModel[]::new);
 			marketplaceFilterSelect.setItems(FXCollections.observableArrayList(tokenSelectOptions));
 			marketplaceFilterSelect.getSelectionModel().select(tokenSelectOptions.length - 1);
-
 			entriesPerPageInput.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(5, 500, 20));
 
+ 			apiUpdateController.currentProgress.addListener((observableValue, number, t1) -> {
+				Platform.runLater(() -> {
+					updateOrdersView();
+				});
+			});
+
+			//setUpApiContols();
+
 			applyFilterValues();
-			updateStatusLabel();
 			updateSelectionInfoLabel();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 
 	}
+
 
 	public void applyFilterValues() {
 		filter.searchText = ((TextField) pageBorderPane.lookup("#searchInput")).getText();
@@ -281,13 +289,7 @@ public class OrdersController {
 		updateOrdersView();
 	}
 
-	private void updateStatusLabel() {
-		List<DataSource> updates = DataAccessBase.getAll(DataSource.class);
-		updates.sort((a, b) -> a.getTime().compareTo(b.getTime()));
 
-		statusLabel.setText("letzte API-Aktualisierung: "
-				+ (updates.size() == 0 ? " - " : AppUtils.formatDateTime(updates.get(0).getTime())));
-	}
 
 	private void updateOrdersView() {
 		totalEntries = OrderDataAccess.count(filter);
@@ -330,10 +332,6 @@ public class OrdersController {
 		ordersSelectedLabel.setText(text);
 	}
 
-	public void setStatusText(String text) {
-		statusLabel.setText(text);
-	}
-
 	public void setLoading(boolean b) {
 		statusLoadingIndicator.setVisible(b);
 	}
@@ -371,21 +369,6 @@ public class OrdersController {
 		updateSelectionInfoLabel();
 	}
 
-	public void handleApiUpdateButton() {
-		if (DataAccessBase.count(OAuth2Token.class) == 0) {
-			Alert a = new Alert(AlertType.ERROR, "Es wurden noch keine API-Konten angelegt.");
-			a.show();
-		} else {
-			progressBar.setVisible(true);
-			progressBar.setProgress(0);
-
-			apiUpdateButton.setDisable(true);
-			Thread thread = new Thread(() -> {
-				updateRemoteOrders(true);
-			});
-			thread.start();
-		}
-	}
 
 	public void handleGeneratePdfButton() {
 		AppUtils.generateOrderInvoices(selectedOrderIds.toArray(Long[]::new));
@@ -419,7 +402,7 @@ public class OrdersController {
 	public void handleTestButtonAction() {
 		var tokens = DataAccessBase.<OAuth2Token>getAll(OAuth2Token.class);
 		tokens.stream().filter(t -> t.isActive()).forEach(t -> {
-			EbayShopApi shopApi = (EbayShopApi)beforeApiCall(t);
+			EbayShopApi shopApi = (EbayShopApi)ShopApiBase.getTargetShopApi(t);
 
 			try {
 				shopApi.insertTestListing(null);
@@ -429,90 +412,7 @@ public class OrdersController {
 			}
 		});	
 	}
-	
-	
-	private ShopApiBase beforeApiCall(OAuth2Token t) {
-		ShopApiBase shopApi = ShopApiBase.getTargetShopApi(t);
 
-		if (shopApi.isTokenExpired()) {
-			try {
-				shopApi.refreshToken();
-			} catch (IOException | InterruptedException | ExecutionException e) {
-				e.printStackTrace();
-			}
-		}
-		
-		return shopApi;
-	}
-
-	public void updateRemoteOrders(boolean skipExisting) {
-		var tokens = DataAccessBase.<OAuth2Token>getAll(OAuth2Token.class);
-		tokens.stream().filter(t -> t.isActive()).forEach(t -> {
-
-			ShopApiBase shopApi = beforeApiCall(t);
-			
-			var updates = DataUpdateDataAccess.getUpdatesForToken(t);
-			Calendar timeFrom = Calendar.getInstance();
-			var update = new DataSource(t, 0);
-
-			if (updates.size() == 0) {
-				timeFrom.add(Calendar.DAY_OF_YEAR, -30);
-			} else {
-				timeFrom.setTime(updates.get(0).getTime());
-				//timeFrom.add(Calendar.DAY_OF_YEAR, -30);
-			}
-
-			update.setTime(Timestamp.from(Instant.now()));
-			final var upd = update;
-
-			var pageNumber = 1;
-			var ordersProcessed = 0;
-
-			try {				
-				SimpleIntegerProperty remainingEntries = new SimpleIntegerProperty(0);
-
-				do {					
-					var ordersPage = shopApi.getOrdersPage(timeFrom, pageNumber++, 3, remainingEntries);
-					ordersPage.forEach(o -> {
-						o.setDataSource(upd);						
-
-						if (!skipExisting
-								|| OrderDataAccess.getByOrderNumber(o.getOrderNumber(), t.getOwner().getPlatform()) == null) {
-							DataAccessBase.insertOrUpdate(o);
-						}
-					});
-
-					ordersProcessed += ordersPage.size();
-					var totalOrders = remainingEntries.get() + ordersProcessed;
-					final double progress = 1d * ordersProcessed / totalOrders;
-
-					final String statusText = "Rufe " + t.getOwner().getPlatform() + "-Bestellungen ab für Token " + t.getName() + ": "
-							+ ordersProcessed + " / " + totalOrders;
-					
-					Platform.runLater(() -> {						
-						progressBar.setProgress(progress);
-						statusLabel.setText(statusText);				
-					});
-
-				} while (remainingEntries.get() > 0);
-
-				upd.setNewEntries(ordersProcessed);
-				Platform.runLater(() -> {
-					DataAccessBase.insertOrUpdate(upd);
-					DataUpdateDataAccess.removeUnusedUpdates(t);
-					updateOrdersView();
-				});
-			} catch (Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		});
-
-		Platform.runLater(() -> {
-			apiUpdateButton.setDisable(false);
-			updateStatusLabel();
-		});
-	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public void tableSortHandler(SortEvent<TableView<ShopOrdersTableRow>> event) {

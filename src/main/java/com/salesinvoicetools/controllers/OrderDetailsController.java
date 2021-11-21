@@ -37,7 +37,6 @@ import javafx.util.converter.LongStringConverter;
 import javafx.util.converter.NumberStringConverter;
 import com.salesinvoicetools.models.Address;
 import com.salesinvoicetools.models.ShopOrder;
-import com.salesinvoicetools.models.ShopOrder.Marketplace;
 
 public class OrderDetailsController {
 
@@ -46,6 +45,7 @@ public class OrderDetailsController {
 
 	@FXML
 	AddressController billingAddressController;
+
 
 	@FXML
 	AddressController deliveryAddressController;
@@ -119,8 +119,6 @@ public class OrderDetailsController {
 			this.shopOrder = new ShopOrder();
 		else
 			this.shopOrder = order;
-		
-		
 	}
 
 	public void initialize() {
@@ -310,7 +308,7 @@ public class OrderDetailsController {
 				"Testprodukt", 
 				"" + (new Random().nextInt()),
 				item.getOwner() == null || item.getOwner().getDataSource() == null ? null
-						: item.getOwner().getDataSource().getToken().getOwner().getPlatform());
+						: item.getOwner().getDataSource().getToken().getOwner().platform);
 
 		item.setProduct(p);
 		item.setOwner(shopOrder);

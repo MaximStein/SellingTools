@@ -24,6 +24,7 @@ import com.salesinvoicetools.models.OrderInvoice;
 import com.salesinvoicetools.models.ShopOrder;
 import com.salesinvoicetools.utils.Pagination;
 import javafx.scene.control.TableColumn.SortType;
+import com.salesinvoicetools.shopapis.ShopApiBase.*;
 
 public class OrderDataAccess extends DataAccessBase {
 
@@ -54,12 +55,11 @@ public class OrderDataAccess extends DataAccessBase {
 		em.getTransaction().commit();
 	}
 
-	public static ShopOrder getByOrderNumber(String orderNumber, ShopOrder.Marketplace p) {
-
-		var orders = DataAccessBase.getWhere(ShopOrder.class, Collections.singletonMap("orderNumber", orderNumber));
+	public static ShopOrder getByOrderNumber(String orderNumber, Marketplace p) {
+		var orders = DataAccessBase.getWhere(ShopOrder.class, "orderNumber", orderNumber);
 		orders = orders.stream()
 				.filter(o -> (p == null && (o.getDataSource() == null || o.getDataSource().getToken() == null))
-						|| (o.getDataSource() != null && o.getDataSource().getToken().getOwner().getPlatform() == p))
+						|| (o.getDataSource() != null && o.getDataSource().getToken().getOwner().platform == p))
 				.collect(Collectors.toList());
 		return orders.size() == 0 ? null : orders.get(0);
 	}
@@ -72,11 +72,8 @@ public class OrderDataAccess extends DataAccessBase {
 	}
 
 	private static List<Predicate> getPredicates(ShopOrdersFilterModel filter, Root<ShopOrder> root) {
-
 		List<Predicate> filterPredicates = new ArrayList<>();
-
 		var builder = em.getCriteriaBuilder();
-
 		Join<OrderInvoice, ShopOrder> invoice = root.join("invoice", JoinType.LEFT);
 
 		if (!Strings.isNullOrEmpty(filter.searchText)) {

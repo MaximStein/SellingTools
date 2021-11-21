@@ -12,8 +12,7 @@ import javax.persistence.Id;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 import javax.persistence.UniqueConstraint;
-
-import com.salesinvoicetools.models.ShopOrder.Marketplace;
+import com.salesinvoicetools.shopapis.ShopApiBase.*;
 
 @Entity
 @Table(uniqueConstraints = { @UniqueConstraint(columnNames = { "marketplace", "productNumber" }) })
@@ -38,11 +37,15 @@ public class Product {
 	public Product() {
 	}
 
+	public Product(Marketplace m, String productNumber) {
+		this.productNumber = productNumber;
+		this.marketplace = m;
+	}
+
 	public Product(long grossPrice, String description, String productNumber, Marketplace mp) {
+		this(mp, productNumber);
 		this.grossPrice = grossPrice;
 		this.description = description;
-		this.productNumber = productNumber;
-		this.marketplace = mp;
 	}
 
 	public List<LineItem> getLineItems() {

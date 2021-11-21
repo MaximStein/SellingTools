@@ -30,6 +30,7 @@ import java.util.TimeZone;
 import com.salesinvoicetools.models.*;
 import com.salesinvoicetools.shopapis.oauth.EbayApi20;
 import com.salesinvoicetools.shopapis.oauth.EbaySandboxApi20;
+import com.salesinvoicetools.utils.AppUtils;
 import org.apache.commons.io.IOUtils;
 
 import com.github.scribejava.core.builder.ServiceBuilder;
@@ -63,7 +64,7 @@ public class FakeEbayShopApi extends ShopApiBase {
 		addr.setStreet("Reinbeker Redder "+index);
 		addr.setCity("Hamburg");
 		addr.setPostalCode("21031");
-		addr.setCountry("Deutschland");
+		addr.country = AppUtils.parseCountry("Deutschland");
 		order.setBillingsAddress(addr);
 		
 		var randVal = r.nextInt(60 * 24 * 60 * 60 * 1000);
@@ -109,9 +110,9 @@ public class FakeEbayShopApi extends ShopApiBase {
 	protected OAuth20Service getOAuth2Service() {
 		var permissionString = "https://api.ebay.com/oauth/api_scope https://api.ebay.com/oauth/api_scope/sell.marketing.readonly https://api.ebay.com/oauth/api_scope/sell.marketing https://api.ebay.com/oauth/api_scope/sell.inventory.readonly https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account.readonly https://api.ebay.com/oauth/api_scope/sell.account https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly https://api.ebay.com/oauth/api_scope/sell.fulfillment https://api.ebay.com/oauth/api_scope/sell.analytics.readonly https://api.ebay.com/oauth/api_scope/sell.finances https://api.ebay.com/oauth/api_scope/sell.payment.dispute https://api.ebay.com/oauth/api_scope/commerce.identity.readonly";
 
-		final OAuth20Service service = new ServiceBuilder(token.getOwner().getClientId())
-				.apiSecret(token.getOwner().getClientSecret()).defaultScope(permissionString)
-				.callback(token.getOwner().getCallbackUrl())
+		final OAuth20Service service = new ServiceBuilder(token.getOwner().clientId)
+				.apiSecret(token.getOwner().clientSecret).defaultScope(permissionString)
+				.callback(token.getOwner().callbackUrl)
 				.build(isSandbox ? EbaySandboxApi20.instance() : EbayApi20.instance());
 		return service;
 	}
@@ -132,7 +133,11 @@ public class FakeEbayShopApi extends ShopApiBase {
 	}
 
 	public ShopOrder getOrder(String orderNumber) {
+		return null;
+	}
 
+	@Override
+	public String getApiBaseUrl() {
 		return null;
 	}
 

@@ -65,7 +65,17 @@ public class DataAccessBase {
 		return entries.get(0);
 	}
 
-	public static <T> List<T> getWhere(Class<T> c, Map<String, Object> where) {
+
+
+	public static <T> List<T> getWhereAnd(Class<T> c, Map<String, Object> where) {
+		return getWhere(c,where,false);
+	}
+
+	public static <T> List<T> getWhereOr(Class<T> c, Map<String, Object> where) {
+		return getWhere(c,where,true);
+	}
+
+	private static <T> List<T> getWhere(Class<T> c, Map<String, Object> where, boolean or) {
 		CriteriaBuilder builder = em.getCriteriaBuilder();
 		CriteriaQuery<T> query = builder.createQuery(c);
 		var root = query.from(c);
@@ -73,13 +83,15 @@ public class DataAccessBase {
 		if (where.size() == 1)
 			query.where(getPredicates(where, root));
 		else
-			query.where(builder.and(getPredicates(where, root)));
+			query.where(or ? builder.or(getPredicates(where, root)) : builder.and(getPredicates(where, root)));
 
 		return em.createQuery(query).getResultList();
 	}
 
+
+
 	public static <T> List<T> getWhere(Class<T> c, String field, Object value) {
-		return getWhere(c, Collections.singletonMap(field, value));
+		return getWhere(c, Collections.singletonMap(field, value), false);
 	}
 
 	public static <T> List<T> getPage(Class<T> c, int pageIndex, int pageSize) {

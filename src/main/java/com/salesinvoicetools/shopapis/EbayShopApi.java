@@ -1,17 +1,11 @@
 package com.salesinvoicetools.shopapis;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLConnection;
 import java.sql.Timestamp;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -19,43 +13,41 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.Dictionary;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.TimeZone;
 
 import com.salesinvoicetools.dataaccess.DataAccessBase;
+import com.salesinvoicetools.dataaccess.ProductsDataAccess;
 import com.salesinvoicetools.models.*;
 import com.salesinvoicetools.shopapis.oauth.EbayApi20;
 import com.salesinvoicetools.shopapis.oauth.EbaySandboxApi20;
+import com.salesinvoicetools.utils.AppUtils;
 import org.apache.commons.io.IOUtils;
+import com.salesinvoicetools.shopapis.ShopApiBase.*;
 
 import com.github.scribejava.core.builder.ServiceBuilder;
 import com.github.scribejava.core.oauth.OAuth20Service;
-import com.google.gson.Gson;
 
 import javafx.beans.property.SimpleIntegerProperty;
 
 public class EbayShopApi extends ShopApiBase {
 
-	private Gson g = new Gson();
 
 	protected EbayShopApi(OAuth2Token t) {
 		super(t, true);
 	}
 
-	protected String getBaseUrl() {
+	public String getApiBaseUrl() {
 		return isSandbox ? "https://api.sandbox.ebay.com" : "https://api.ebay.com";
 	}
 
 	protected OAuth20Service getOAuth2Service() {
 		var permissionString = "https://api.ebay.com/oauth/api_scope https://api.ebay.com/oauth/api_scope/sell.marketing.readonly https://api.ebay.com/oauth/api_scope/sell.marketing https://api.ebay.com/oauth/api_scope/sell.inventory.readonly https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account.readonly https://api.ebay.com/oauth/api_scope/sell.account https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly https://api.ebay.com/oauth/api_scope/sell.fulfillment https://api.ebay.com/oauth/api_scope/sell.analytics.readonly https://api.ebay.com/oauth/api_scope/sell.finances https://api.ebay.com/oauth/api_scope/sell.payment.dispute https://api.ebay.com/oauth/api_scope/commerce.identity.readonly";
 
-		final OAuth20Service service = new ServiceBuilder(token.getOwner().getClientId())
-				.apiSecret(token.getOwner().getClientSecret()).defaultScope(permissionString)
-				.callback(token.getOwner().getCallbackUrl())
+		final OAuth20Service service = new ServiceBuilder(token.getOwner().clientId)
+				.apiSecret(token.getOwner().clientId).defaultScope(permissionString)
+				.callback(token.getOwner().clientId)
 				.build(isSandbox ? EbaySandboxApi20.instance() : EbayApi20.instance());
 		return service;
 	}
@@ -67,10 +59,10 @@ public class EbayShopApi extends ShopApiBase {
 		String timeIso = ZonedDateTime.ofInstant(createTimeFrom.toInstant(), ZoneId.of("Z"))
 				.format(DateTimeFormatter.ISO_INSTANT);
 
-		var orderResult = makeHttpCall(getBaseUrl() + "/sell/fulfillment/v1/order" + "?filter=creationdate:%5B"
+		var orderResult = makeHttpCall(getApiBaseUrl() + "/sell/fulfillment/v1/order" + "?filter=creationdate:%5B"
 				+ timeIso + "..%5D&limit=" + pageSize + "&offset=" + ((pageNumber - 1) * pageSize));
 
-		OrderSearchPagedCollection ordersResult = g.fromJson(orderResult, OrderSearchPagedCollection.class);
+		OrderSearchPagedCollection ordersResult = gson.fromJson(orderResult, OrderSearchPagedCollection.class);
 
 		List<ShopOrder> orders = new ArrayList<>();
 
@@ -83,8 +75,8 @@ public class EbayShopApi extends ShopApiBase {
 			if (order.fulfillmentHrefs.length > 0) {
 				try {
 					var shippingResult = makeHttpCall(
-							getBaseUrl() + "/sell/fulfillment/v1/order/" + order.orderId + "/shipping_fulfillment");
-					shipping = g.fromJson(shippingResult, ShippingFulfillmentPagedCollection.class);
+							getApiBaseUrl() + "/sell/fulfillment/v1/order/" + order.orderId + "/shipping_fulfillment");
+					shipping = gson.fromJson(shippingResult, ShippingFulfillmentPagedCollection.class);
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -106,7 +98,7 @@ public class EbayShopApi extends ShopApiBase {
 		addr.setCity(p.contactAddress.city);
 		addr.setStreet(p.contactAddress.addressLine1);
 		addr.setAdditionalInfo(p.contactAddress.addressLine2);
-		addr.setCountry(p.contactAddress.countryCode);
+		addr.country = AppUtils.parseCountry(p.contactAddress.countryCode);
 		addr.setPostalCode(p.contactAddress.postalCode);
 
 		if (p.primaryPhone != null)
@@ -135,19 +127,10 @@ public class EbayShopApi extends ShopApiBase {
 		for (var t : ebayOrder.lineItems) {
 			var item = new LineItem();
 			item.setOwner(order);
-			var products = DataAccessBase.<Product>getWhere(Product.class,
-					Map.of("productNumber", t.legacyItemId, "marketplace", token.getOwner().getPlatform()));
 
-			Product product;
-
-			if (products.size() == 0)
-				product = new Product(Math.round(t.lineItemCost.convertedFromValue / t.quantity * 100), t.title,
-						t.legacyItemId, ShopOrder.Marketplace.EBAY);
-			else
-				product = products.get(0);
-
-			product.setDescription(t.title);
-			product.setProductNumber(t.legacyItemId);
+			Product product = ProductsDataAccess.getNewOrExisting(Marketplace.EBAY, t.legacyItemId);
+			product.grossPrice = Math.round(t.lineItemCost.convertedFromValue / t.quantity * 100);
+			product.description = t.title;
 
 			DataAccessBase.insertOrUpdate(product);
 
@@ -184,13 +167,13 @@ public class EbayShopApi extends ShopApiBase {
 			i.product.imageUrls = new String[] { "https://i.ebayimg.com/images/g/~QwAAOSwUfReZmHh/s-l1600.jpg "};
 			
 			
-			var content = g.toJson(i);
+			var content = gson.toJson(i);
 			
 			System.out.println(content);
 			
 			System.out.println("============================================");
-			var orderResult = makeHttpCall(getBaseUrl() + "/sell/inventory/v1/inventory_item/G123135523", "PUT",
-					g.toJson(i));
+			var orderResult = makeHttpCall(getApiBaseUrl() + "/sell/inventory/v1/inventory_item/G123135523", "PUT",
+					gson.toJson(i));
 			System.out.println(orderResult);
 
 		} catch (IOException e) {
@@ -201,11 +184,11 @@ public class EbayShopApi extends ShopApiBase {
 	public ShopOrder getOrder(String orderNumber) {
 
 		try {
-			var orderResult = makeHttpCall(getBaseUrl() + "/sell/fulfillment/v1/order/" + orderNumber);
+			var orderResult = makeHttpCall(getApiBaseUrl() + "/sell/fulfillment/v1/order/" + orderNumber);
 			var shippingResult = makeHttpCall(
-					getBaseUrl() + "/sell/fulfillment/v1/order/" + orderNumber + "/shipping_fulfillment");
-			EbayOrder order = g.fromJson(orderResult, EbayOrder.class);
-			ShippingFulfillmentPagedCollection fulfillments = g.fromJson(shippingResult,
+					getApiBaseUrl() + "/sell/fulfillment/v1/order/" + orderNumber + "/shipping_fulfillment");
+			EbayOrder order = gson.fromJson(orderResult, EbayOrder.class);
+			ShippingFulfillmentPagedCollection fulfillments = gson.fromJson(shippingResult,
 					ShippingFulfillmentPagedCollection.class);
 
 		} catch (IOException e) {
@@ -238,31 +221,23 @@ public class EbayShopApi extends ShopApiBase {
 		System.out.println(method+ "|"+http.getRequestMethod());
 		
 		if (content != null) {
-
 			try (OutputStream os = http.getOutputStream()) {
 				byte[] input = content.getBytes("utf-8");
 				os.write(input, 0, input.length);
 				os.close();
 			}
-			
-			
 		} else {
 		}
-
-		
 		InputStream inputStream = null;     
 		try {
 		    inputStream = http.getInputStream();
 		} catch(IOException exception) {
 		   inputStream = http.getErrorStream();
 		}
-		
-		
+
 		System.out.println("[" + http.getResponseCode() + "]");
 		try {
-
 			String theString = IOUtils.toString(inputStream, "UTF-8");
-			
 			return theString;
 		} catch (IOException e) {
 			e.printStackTrace();

@@ -29,9 +29,15 @@ public class DataSource {
 	public int newEntries;
 
 	public DataSource() {
+		this.time = Timestamp.from(Instant.now());
 	}
 
+	public DataSource(OAuth2Token token) {
+		this();
+		this.token = token;
+	}
 	public DataSource(OAuth2Token token, int newEntries) {
+		this();
 		this.token = token;
 		this.newEntries = newEntries;
 		this.time = Timestamp.from(Instant.now());

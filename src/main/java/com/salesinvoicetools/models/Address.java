@@ -1,8 +1,6 @@
 package com.salesinvoicetools.models;
 
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Id;
+import javax.persistence.*;
 
 @Entity
 public class Address {
@@ -25,8 +23,10 @@ public class Address {
 	
 	public String city;
 
+	@Enumerated(EnumType.STRING)
+	public Country country;
 
-	public String country;
+	public String customInfo;
 	
 	public String toString() {
 		return name+"\r\n"
@@ -100,12 +100,8 @@ public class Address {
 		this.city = city;
 	}
 
-	public String getCountry() {
-		return country;
-	}
 
-	public void setCountry(String country) {
-		this.country = country;
+	public enum Country {
+		DE, UK, AT, FR, IT, RM, PL, NL, USA, CND, OTHER;
 	}
-
 }
