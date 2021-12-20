@@ -112,7 +112,7 @@
                      </VBox.margin>
                   </TextArea>
                   <CheckBox fx:id="emailOnInvoiceCheckbox" mnemonicParsing="false" text="E-Mail-Adresse auf Rechnungen" />
-            <TextField fx:id="invoiceDirectoryInput" promptText="Speichertort der Rechnungs-PDFs">
+            <TextField fx:id="appDataDirectoryInput" promptText="App-Datenverzeichnis">
                <VBox.margin>
                   <Insets top="50.0" />
                </VBox.margin>

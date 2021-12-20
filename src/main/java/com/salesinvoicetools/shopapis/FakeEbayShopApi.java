@@ -1,41 +1,18 @@
 package com.salesinvoicetools.shopapis;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLConnection;
 import java.sql.Timestamp;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Date;
-import java.util.Dictionary;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.Random;
-import java.util.TimeZone;
 
 import com.salesinvoicetools.models.*;
 import com.salesinvoicetools.shopapis.oauth.EbayApi20;
 import com.salesinvoicetools.shopapis.oauth.EbaySandboxApi20;
 import com.salesinvoicetools.utils.AppUtils;
-import org.apache.commons.io.IOUtils;
 
 import com.github.scribejava.core.builder.ServiceBuilder;
 import com.github.scribejava.core.oauth.OAuth20Service;
-import com.google.gson.Gson;
 
 import javafx.beans.property.SimpleIntegerProperty;
 
@@ -84,15 +61,15 @@ public class FakeEbayShopApi extends ShopApiBase {
 
 		var testProduct = new Product();
 		
-		testProduct.setDescription("testproduct "+index);
+		testProduct.setTitle("testproduct "+index);
 		testProduct.setProductNumber(""+r.nextInt(Integer.MAX_VALUE));
-		testProduct.setGrossPrice(1500l);
+		testProduct.grossPriceMin = testProduct.grossPriceMax = 1500l;
 
 		var lineItem1 = new LineItem();
 		lineItem1.setOwner(order);
 		lineItem1.setQuantity(3);
 		lineItem1.setProduct(testProduct);
-		lineItem1.setTotalPriceGross(testProduct.getGrossPrice() * lineItem1.getQuantity());
+		lineItem1.setTotalPriceGross(testProduct.grossPriceMax * lineItem1.getQuantity());
 		order.getItems().add(lineItem1);
 
 		order.setShippingCosts(150);
@@ -133,6 +110,11 @@ public class FakeEbayShopApi extends ShopApiBase {
 	}
 
 	public ShopOrder getOrder(String orderNumber) {
+		return null;
+	}
+
+	@Override
+	public Product getProduct(String itemId) {
 		return null;
 	}
 

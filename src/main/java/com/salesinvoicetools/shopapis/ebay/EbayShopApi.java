@@ -1,30 +1,29 @@
-package com.salesinvoicetools.shopapis;
+package com.salesinvoicetools.shopapis.ebay;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.sql.Timestamp;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ExecutionException;
 
+import com.google.api.client.util.Strings;
 import com.salesinvoicetools.dataaccess.DataAccessBase;
 import com.salesinvoicetools.dataaccess.ProductsDataAccess;
 import com.salesinvoicetools.models.*;
+import com.salesinvoicetools.shopapis.ShopApiBase;
+import com.salesinvoicetools.shopapis.ebay.Pojos.*;
 import com.salesinvoicetools.shopapis.oauth.EbayApi20;
 import com.salesinvoicetools.shopapis.oauth.EbaySandboxApi20;
 import com.salesinvoicetools.utils.AppUtils;
 import org.apache.commons.io.IOUtils;
-import com.salesinvoicetools.shopapis.ShopApiBase.*;
+
 
 import com.github.scribejava.core.builder.ServiceBuilder;
 import com.github.scribejava.core.oauth.OAuth20Service;
@@ -34,20 +33,23 @@ import javafx.beans.property.SimpleIntegerProperty;
 public class EbayShopApi extends ShopApiBase {
 
 
-	protected EbayShopApi(OAuth2Token t) {
-		super(t, true);
+	public EbayShopApi(OAuth2Token t) {
+		super(t, false);
 	}
 
 	public String getApiBaseUrl() {
 		return isSandbox ? "https://api.sandbox.ebay.com" : "https://api.ebay.com";
 	}
 
+	private static final String scopes="https://api.ebay.com/oauth/api_scope https://api.ebay.com/oauth/api_scope/sell.marketing.readonly https://api.ebay.com/oauth/api_scope/sell.marketing https://api.ebay.com/oauth/api_scope/sell.inventory.readonly https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account.readonly https://api.ebay.com/oauth/api_scope/sell.account https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly https://api.ebay.com/oauth/api_scope/sell.fulfillment https://api.ebay.com/oauth/api_scope/sell.analytics.readonly https://api.ebay.com/oauth/api_scope/sell.finances https://api.ebay.com/oauth/api_scope/sell.payment.dispute https://api.ebay.com/oauth/api_scope/commerce.identity.readonly";
+
 	protected OAuth20Service getOAuth2Service() {
 		var permissionString = "https://api.ebay.com/oauth/api_scope https://api.ebay.com/oauth/api_scope/sell.marketing.readonly https://api.ebay.com/oauth/api_scope/sell.marketing https://api.ebay.com/oauth/api_scope/sell.inventory.readonly https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account.readonly https://api.ebay.com/oauth/api_scope/sell.account https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly https://api.ebay.com/oauth/api_scope/sell.fulfillment https://api.ebay.com/oauth/api_scope/sell.analytics.readonly https://api.ebay.com/oauth/api_scope/sell.finances https://api.ebay.com/oauth/api_scope/sell.payment.dispute https://api.ebay.com/oauth/api_scope/commerce.identity.readonly";
 
 		final OAuth20Service service = new ServiceBuilder(token.getOwner().clientId)
-				.apiSecret(token.getOwner().clientId).defaultScope(permissionString)
-				.callback(token.getOwner().clientId)
+				.apiSecret(token.getOwner().clientSecret).defaultScope(permissionString)
+				.callback(token.getOwner().callbackUrl)
+
 				.build(isSandbox ? EbaySandboxApi20.instance() : EbayApi20.instance());
 		return service;
 	}
@@ -58,33 +60,37 @@ public class EbayShopApi extends ShopApiBase {
 
 		String timeIso = ZonedDateTime.ofInstant(createTimeFrom.toInstant(), ZoneId.of("Z"))
 				.format(DateTimeFormatter.ISO_INSTANT);
-
 		var orderResult = makeHttpCall(getApiBaseUrl() + "/sell/fulfillment/v1/order" + "?filter=creationdate:%5B"
 				+ timeIso + "..%5D&limit=" + pageSize + "&offset=" + ((pageNumber - 1) * pageSize));
 
-		OrderSearchPagedCollection ordersResult = gson.fromJson(orderResult, OrderSearchPagedCollection.class);
-
+		Pojos.OrderSearchPagedCollection ordersResult = gson.fromJson(orderResult, Pojos.OrderSearchPagedCollection.class);
 		List<ShopOrder> orders = new ArrayList<>();
+
+		if(ordersResult == null) {
+			AppUtils.log("=== API call failed ===");
+			return orders;
+		}
+
+		if(ordersResult.orders == null) {
+			AppUtils.log("=== no orders returned ===");
+			return orders;
+		}
 
 		outRemainingItems.set(ordersResult.total - ((pageNumber - 1) * pageSize + ordersResult.orders.length));
 
 		Arrays.stream(ordersResult.orders).forEach(order -> {
-
-			ShippingFulfillmentPagedCollection shipping = null;
-
+			Pojos.ShippingFulfillmentPagedCollection shipping = null;
 			if (order.fulfillmentHrefs.length > 0) {
 				try {
 					var shippingResult = makeHttpCall(
 							getApiBaseUrl() + "/sell/fulfillment/v1/order/" + order.orderId + "/shipping_fulfillment");
-					shipping = gson.fromJson(shippingResult, ShippingFulfillmentPagedCollection.class);
-				} catch (IOException e) {
+					shipping = gson.fromJson(shippingResult, Pojos.ShippingFulfillmentPagedCollection.class);
+				} catch (IOException | ExecutionException | InterruptedException e) {
 					e.printStackTrace();
 				}
 			}
-
 			orders.add(getConvertedShopOrder(order, shipping));
 		});
-
 		return orders;
 	}
 
@@ -107,10 +113,10 @@ public class EbayShopApi extends ShopApiBase {
 		return addr;
 	}
 
-	private ShopOrder getConvertedShopOrder(EbayOrder ebayOrder, ShippingFulfillmentPagedCollection shipping) {
+	private ShopOrder getConvertedShopOrder(Pojos.EbayOrder ebayOrder, Pojos.ShippingFulfillmentPagedCollection shipping) {
 		ShopOrder order = new ShopOrder();
-		order.setTotalGrossAmount(Math.round(ebayOrder.pricingSummary.total.convertedFromValue * 100));
-		order.setCurrencyCode(ebayOrder.pricingSummary.total.convertedFromCurrency);
+		order.totalGrossAmount = Math.round(ebayOrder.pricingSummary.total.value * 100);
+		order.setCurrencyCode(ebayOrder.pricingSummary.total.currency);
 		order.setOrderNumber(ebayOrder.orderId);
 		order.setPaymentComplete(ebayOrder.orderPaymentStatus.equals("PAID"));
 		order.setBuyerCheckoutMessage(ebayOrder.buyerCheckoutNotes);
@@ -129,21 +135,29 @@ public class EbayShopApi extends ShopApiBase {
 			item.setOwner(order);
 
 			Product product = ProductsDataAccess.getNewOrExisting(Marketplace.EBAY, t.legacyItemId);
-			product.grossPrice = Math.round(t.lineItemCost.convertedFromValue / t.quantity * 100);
-			product.description = t.title;
+			product.grossPriceMin = product.grossPriceMax = Math.round(t.lineItemCost.value / t.quantity * 100);
+			product.title = t.title;
+
+			if(Strings.isNullOrEmpty(product.imageUrls)) {
+				var apiProduct = getProduct(t.legacyItemId);
+				if(apiProduct != null) {
+					product.imageUrls = apiProduct.imageUrls;
+				}
+			}
 
 			DataAccessBase.insertOrUpdate(product);
 
 			item.setProduct(product);
 			item.setQuantity(t.quantity);
 			item.setVariation(t.legacyVariationId);
-			item.setTotalPriceGross(Math.round(t.total.convertedFromValue * 100));
+			item.setTotalPriceGross(Math.round(t.total.value * 100));
 			order.getItems().add(item);
-
 		}
 
 		return order;
 	}
+
+
 
 	public void insertTestListing(Product p) throws Exception {
 
@@ -152,7 +166,7 @@ public class EbayShopApi extends ShopApiBase {
 
 		try {
 
-			var i = new IntenvoryItem();
+			var i = new Pojos.IntenvoryItem();
 			i.availability = new Availability();
 			i.availability.shipToLocationAvailability = new ShipToLocationAvailability();
 			i.availability.shipToLocationAvailability.quantity = 50;
@@ -191,22 +205,92 @@ public class EbayShopApi extends ShopApiBase {
 			ShippingFulfillmentPagedCollection fulfillments = gson.fromJson(shippingResult,
 					ShippingFulfillmentPagedCollection.class);
 
-		} catch (IOException e) {
+		} catch (IOException | ExecutionException | InterruptedException e) {
 			e.printStackTrace();
 		}
 
 		return null;
 	}
 
-	private String makeHttpCall(String endpoint) throws IOException {
+	@Override
+	public Product getProduct(String itemId) {
+		try {
+			var content = this.makeHttpCall(getApiBaseUrl()+"/buy/browse/v1/item/get_item_by_legacy_id?legacy_item_id="+itemId);
+			var item = gson.fromJson(content, EbayOrder.Item.class);
+			var error = gson.fromJson(content, EbayOrder.ErrorResponse.class);
+			var p = new Product();
+			p.productNumber = itemId;
+
+			if(item.title == null) {
+				if(error.errors.get(0).errorId == 11006) {
+					content = makeHttpCall(getApiBaseUrl()+"/buy/browse/v1/item/get_items_by_item_group?item_group_id="+itemId);
+					var group = gson.fromJson(content, EbayOrder.ItemGroup.class);
+
+					if(group == null) {
+						return null;
+					}
+
+					var prices = group.items.stream().map(item1 -> Math.round(item1.price.value * 100));
+
+					var maxPrice = group.items.stream().map(item1 -> Math.round(item1.price.value * 100)).max(Long::compareTo).get();
+					var minPrice = group.items.stream().map(item1 -> Math.round(item1.price.value * 100)).min(Long::compareTo).get();
+
+					p.grossPriceMax = maxPrice;
+					p.grossPriceMin = minPrice;
+				}
+			}
+			else {
+
+				System.out.println(content);
+				p.imageUrls = item.image.imageUrl;
+				p.marketplace = Marketplace.EBAY;
+				p.grossPriceMin = p.grossPriceMax = Math.round(item.price.value * 100);
+				p.title = item.title;
+				//p.customData = content;
+				//p.imageUrls
+				return p;
+			}
+
+		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (ExecutionException e) {
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+
+		return null;
+	}
+
+
+	@Override
+	public String getOAuth2AuthorizationUrl() {
+
+		String oAuth2AuthorizationUrl = super.getOAuth2AuthorizationUrl();
+
+		var url ="https://auth.ebay.com/oauth2/authorize?" +
+				"client_id="+this.token.owner.clientId +
+				"&redirect_uri="+this.token.owner.callbackUrl+"&" +
+				"response_type=code&" +
+				"state=1&" +
+				"scope="+ URLEncoder.encode(scopes)+"&" +
+				"prompt=login";
+
+		return url;
+	}
+
+	private String makeHttpCall(String endpoint) throws IOException, ExecutionException, InterruptedException {
 		return makeHttpCall(endpoint, null, null);
 	}
 
-	private String makeHttpCall(String endpoint, String method, String content) throws IOException {
+	private String makeHttpCall(String endpoint, String method, String content) throws IOException, ExecutionException, InterruptedException {
 
 		URL url = new URL(endpoint);
 		HttpURLConnection http = (HttpURLConnection) url.openConnection();
 		
+		if(isTokenExpired()) {
+			refreshToken();
+		}
 
 		http.setRequestProperty("Authorization", "Bearer " + token.getAccessToken());
 		http.setRequestProperty("Content-Language", "en-US");
@@ -246,168 +330,6 @@ public class EbayShopApi extends ShopApiBase {
 		return null;
 	}
 
-	class OrderSearchPagedCollection {
-		int limit;
-		int total;
-		String next;
-		int offset;
-		EbayOrder[] orders;
-		ErrorDetailV3[] warnings;
-	}
-
-	class ShippingFulfillmentPagedCollection {
-		ShippingFulfillment[] fulfillments;
-		int total;
-		ErrorDetailV3[] warnings;
-	}
-
-	class ErrorDetailV3 {
-		String category;
-		String domain;
-		String errorId;
-		String[] inputRefIds;
-		String longMessage;
-		String message;
-		String[] outputRefIds;
-		String subDomain;
-	}
-
-	class ShippingFulfillment {
-		String fulfillmentId;
-		LineItem[] lineItems;
-		String shipmentTrackingNumber;
-		Date shippedDate;
-		String shippingCarrierCode;
-	}
-
-	
-	class ShipToLocationAvailability {
-		int quantity;
-		
-	}
-	
-	class Availability {
-		ShipToLocationAvailability shipToLocationAvailability;
-	}
-	
-	class EbayProduct {
-		String brand;
-		String title;
-		String description;
-		HashMap<String, String[]> aspects;
-		String product;
-		String mpn;
-		String[] imageUrls;
-	}
-	
-	class IntenvoryItem {
-		Availability availability;
-		String condition;
-		EbayProduct product;
-	}
-	
-	class EbayOrder {
-
-		String orderId;
-		Date creationDate;
-		Date lastModifiedDate;
-		String orderFulfillmentStatus;
-		String orderPaymentStatus;
-		String sellerId;
-		String buyerCheckoutNotes;
-		PricingSummary pricingSummary;
-		CancelStatus cancelStatus;
-		PaymentSummary paymentSummary;
-		LineItem[] lineItems;
-		FulfillmentStartInstruction[] fulfillmentStartInstructions;
-		String[] fulfillmentHrefs;
-		Buyer buyer;
-
-		class Buyer {
-			String username;
-			Addr taxAddress;
-		}
-
-		class CancelStatus {
-			public String cancelState;
-
-		}
-
-		class LineItem {
-			String lineItemId;
-			String legacyItemId;
-			String legacyVariationId;
-			String title;
-			int quantity;
-			Amount total;
-			DeliveryCost deliveryCost;
-			Amount lineItemCost;
-			Amount discountedLineItemCost;
-		}
-
-		class Amount {
-			double convertedFromValue;
-			String convertedFromCurrency;
-		}
-
-		class DeliveryCost {
-			Amount shippingCost;
-		}
-
-		class PricingSummary {
-			Amount pricingSummary;
-			Amount deliveryCost;
-			Amount total;
-		}
-
-		class PaymentSummary {
-			Amount totalDueSeller;
-			Payment[] payments;
-			Amount[] refunds;
-
-		}
-
-		class Payment {
-			String paymentMethod;
-			String paymentReferenceId;
-			Amount amount;
-			String paymentStatus;
-		}
-
-		class FulfillmentStartInstruction {
-			String fulfillmentInstructionsType;
-			Date minEstimatedDeliveryDate;
-			Date maxEstimatedDeliveryDate;
-			boolean ebaySupportedFulfillment;
-			ShippingStep shippingStep;
-		}
-
-		class ShippingStep {
-			String shippingCarrierCode;
-			String shippingServiceCode;
-			Person shipTo;
-		}
-
-		class Person {
-			String fullName;
-			Addr contactAddress;
-			String email;
-			Phone primaryPhone;
-		}
-
-		class Phone {
-			String phoneNumber;
-		}
-
-		class Addr {
-			String addressLine1;
-			String addressLine2;
-			String city;
-			String postalCode;
-			String countryCode;
-		}
-
-	}
 
 	// private enum CancelState { NONE_REQUESTED };
 

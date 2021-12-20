@@ -1,6 +1,7 @@
 package com.salesinvoicetools.models;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import javax.persistence.CascadeType;
@@ -12,6 +13,8 @@ import javax.persistence.Id;
 import javax.persistence.OneToMany;
 import javax.persistence.Table;
 import javax.persistence.UniqueConstraint;
+
+import com.google.api.client.util.Strings;
 import com.salesinvoicetools.shopapis.ShopApiBase.*;
 
 @Entity
@@ -25,14 +28,20 @@ public class Product {
 	@GeneratedValue
 	public long id;
 
-	public long grossPrice;
+	public long grossPriceMin;
 
-	public String description;
+	public long grossPriceMax;
+
+	public String title;
 
 	public String productNumber;
 
+	public String imageUrls;
+
 	@Enumerated(EnumType.STRING)
 	public Marketplace marketplace;
+
+	public String customData;
 
 	public Product() {
 	}
@@ -44,8 +53,12 @@ public class Product {
 
 	public Product(long grossPrice, String description, String productNumber, Marketplace mp) {
 		this(mp, productNumber);
-		this.grossPrice = grossPrice;
-		this.description = description;
+		this.grossPriceMin = this.grossPriceMax = grossPrice;
+		this.title = description;
+	}
+
+	public String[] getImageUrls() {
+		return imageUrls == null ? new String[]{} : imageUrls.split(",");
 	}
 
 	public List<LineItem> getLineItems() {
@@ -64,20 +77,12 @@ public class Product {
 		this.id = id;
 	}
 
-	public long getGrossPrice() {
-		return grossPrice;
+	public String getTitle() {
+		return title;
 	}
 
-	public void setGrossPrice(long grossPrice) {
-		this.grossPrice = grossPrice;
-	}
-
-	public String getDescription() {
-		return description;
-	}
-
-	public void setDescription(String description) {
-		this.description = description;
+	public void setTitle(String title) {
+		this.title = title;
 	}
 
 	public String getProductNumber() {

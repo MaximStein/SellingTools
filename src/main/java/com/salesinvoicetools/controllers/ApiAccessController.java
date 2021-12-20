@@ -2,6 +2,7 @@ package com.salesinvoicetools.controllers;
 
 import com.salesinvoicetools.AppWindow;
 import com.salesinvoicetools.dataaccess.ApiAccessDataAccess;
+import com.salesinvoicetools.dataaccess.AppSettings;
 import com.salesinvoicetools.dataaccess.DataAccessBase;
 import com.salesinvoicetools.models.ApiAccess;
 import com.salesinvoicetools.models.OAuth2Token;
@@ -19,12 +20,11 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.paint.Color;
 import javafx.scene.web.WebView;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.Window;
-import org.controlsfx.control.NotificationPane;
-import org.controlsfx.control.Notifications;
 
 import java.io.IOException;
 import java.net.URLDecoder;
@@ -59,9 +59,26 @@ public class ApiAccessController {
 
 	@FXML
 	ChoiceBox<Marketplace> platformChoiceBox;
-	
+
+
 	@FXML
 	CheckBox apiEntryActiveCheckbox;
+
+	@FXML
+	TextField firstEditingField;
+
+	@FXML
+	TextField secondEditingField;
+
+	@FXML
+	TextField editingField3;
+
+	@FXML
+	Button saveButton;
+
+	@FXML
+	ColorPicker tokenColorPicker;
+
 
 	public void initialize() {
 
@@ -75,22 +92,50 @@ public class ApiAccessController {
 
 		if (apiAccessTreeView != null) {			
 			apiAccessTreeView.getSelectionModel().selectedItemProperty()
-					.addListener(new ChangeListener<TreeItem<Object>>() {
-						@Override
-						public void changed(ObservableValue<? extends TreeItem<Object>> observable,
-								TreeItem<Object> oldVal, TreeItem<Object> newVal) {
-							if (newVal != null && newVal.getValue() instanceof ApiAccess)
+					.addListener((observable, oldVal, newVal) -> {
+
+						addAccountButton.setDisable(true);
+						apiEntryActiveCheckbox.setSelected(false);
+						apiEntryActiveCheckbox.setDisable(true);
+						firstEditingField.setDisable(true);
+						firstEditingField.clear();
+						secondEditingField.clear();
+						secondEditingField.setDisable(true);
+						editingField3.setDisable(true);
+						editingField3.clear();
+
+
+
+						if (newVal != null) {
+							if (newVal.getValue() instanceof ApiAccess) {
+								var item = (ApiAccess) newVal.getValue();
 								addAccountButton.setDisable(false);
-							else
-								addAccountButton.setDisable(true);
-							
-							if(newVal != null && newVal.getValue() instanceof OAuth2Token) {
-								apiEntryActiveCheckbox.setSelected(((OAuth2Token) newVal.getValue()).isActive());
+								firstEditingField.setText(item.clientId);
+								firstEditingField.setDisable(false);
+
+								secondEditingField.setText(item.clientSecret);
+								secondEditingField.setDisable(false);
+
+								editingField3.setText(item.callbackUrl);
+								editingField3.setDisable(false);
+
+								tokenColorPicker.setDisable(true);
+							} else if (newVal.getValue() instanceof OAuth2Token) {
+								var item = (OAuth2Token) newVal.getValue();
+
+								apiEntryActiveCheckbox.setSelected(item.isActive());
 								apiEntryActiveCheckbox.setDisable(false);
-							}
-							else {
-								apiEntryActiveCheckbox.setSelected(true);								
-								apiEntryActiveCheckbox.setDisable(true);
+
+								firstEditingField.setDisable(false);
+								firstEditingField.setText(item.name);
+
+								secondEditingField.setText(item.accessToken);
+
+								tokenColorPicker.setDisable(false);
+								var settingsKey = AppSettings.TOKEN_COLOR_+item.owner.platform+"_"+item.name;
+								var clr = AppSettings.getString(settingsKey, "#EEEEEE");
+
+								tokenColorPicker.setValue(Color.web(clr));
 							}
 						}
 					});
@@ -107,6 +152,37 @@ public class ApiAccessController {
 						}
 					});			
 		}
+
+		saveButton.setOnAction(actionEvent -> {
+			AppUtils.log(getSelectedItem() == null ? " - ": getSelectedItem().toString());
+			var item = getSelectedItem();
+
+			if(item instanceof OAuth2Token ) {
+				var i = (OAuth2Token)item;
+				i.name = firstEditingField.getText();
+				DataAccessBase.insertOrUpdate(item);
+
+				var settingsKey = AppSettings.TOKEN_COLOR_+i.owner.platform+"_"+i.name;
+				var clr = AppSettings.getString(settingsKey, "#EEEEEE");
+
+				AppSettings.setString(settingsKey,AppUtils.toRGBCode(tokenColorPicker.getValue()));
+			}
+			else if(item instanceof ApiAccess ) {
+				((ApiAccess)item).clientId = firstEditingField.getText();
+				((ApiAccess)item).clientSecret = secondEditingField.getText();
+				((ApiAccess)item).callbackUrl = editingField3.getText();
+
+
+
+				DataAccessBase.insertOrUpdate(item);
+			}
+		});
+	}
+
+	public Object getSelectedItem() {
+		return apiAccessTreeView.getSelectionModel().getSelectedItems().size() == 0
+				? null
+				: apiAccessTreeView.getSelectionModel().getSelectedItem().getValue();
 	}
 
 	/**
@@ -162,7 +238,6 @@ public class ApiAccessController {
 		});
 		apiAccessTreeView.setRoot(apiAccessRootNode);
 	}
-
 	
 	@FXML
 	protected void handleRemoveApiButton(ActionEvent e) {
@@ -271,7 +346,10 @@ public class ApiAccessController {
 						api.tokens.add(token);
 
 						DataAccessBase.insertOrUpdate(api);
-						AppUtils.showNotification("Zugang gespeichert", "API-Konto Nr. "+DataAccessBase.count(OAuth2Token.class)+" eingetragen");
+						AppUtils.showNotification("Zugang gespeichert",
+								"API-Konto Nr. "+DataAccessBase.count(OAuth2Token.class)+" eingetragen",
+								AppUtils.NotificationType.INFO
+						);
 						stage.close();
 					}
 

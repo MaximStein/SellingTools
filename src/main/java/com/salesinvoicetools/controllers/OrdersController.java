@@ -1,13 +1,13 @@
 package com.salesinvoicetools.controllers;
 
-import com.github.scribejava.core.model.Token;
+import com.google.api.client.util.Strings;
 import com.salesinvoicetools.AppWindow;
+import com.salesinvoicetools.dataaccess.AppSettings;
 import com.salesinvoicetools.dataaccess.DataAccessBase;
-import com.salesinvoicetools.dataaccess.DataUpdateDataAccess;
 import com.salesinvoicetools.dataaccess.OrderDataAccess;
 import com.salesinvoicetools.dataaccess.models.ShopOrdersFilterModel;
 import com.salesinvoicetools.models.*;
-import com.salesinvoicetools.shopapis.EbayShopApi;
+import com.salesinvoicetools.shopapis.ebay.EbayShopApi;
 import com.salesinvoicetools.shopapis.ShopApiBase;
 import com.salesinvoicetools.utils.AppUtils;
 import com.salesinvoicetools.viewmodels.ShopOrdersTableRow;
@@ -15,7 +15,7 @@ import com.salesinvoicetools.viewmodels.TokenSelectModel;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIcon;
 import de.jensd.fx.glyphs.fontawesome.FontAwesomeIconView;
 import javafx.application.Platform;
-import javafx.beans.property.SimpleIntegerProperty;
+import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -27,28 +27,28 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
-import javafx.scene.control.Alert.AlertType;
-import javafx.scene.control.TableColumn.SortType;
 import javafx.scene.control.cell.CheckBoxTableCell;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.image.WritableImage;
 import javafx.scene.layout.*;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.util.Callback;
-import net.synedra.validatorfx.Check;
 import org.controlsfx.control.CheckComboBox;
-import org.controlsfx.control.PopOver;
 
+import javax.imageio.ImageIO;
+import java.io.File;
 import java.io.IOException;
-import java.sql.Array;
+import java.net.URL;
 import java.sql.Timestamp;
-import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class OrdersController {
 
+	public static OrdersController instance;
 	@FXML
 	javafx.scene.control.Pagination ordersPagination;
 
@@ -62,13 +62,16 @@ public class OrdersController {
 	Label ordersSelectedLabel;
 
 	@FXML
-	ChoiceBox<TokenSelectModel> marketplaceFilterSelect;
+	CheckComboBox<TokenSelectModel> marketplaceFilterBox;
+
+	@FXML
+	public VBox mainContainer;
 
 	@FXML
 	TableColumn<ShopOrdersTableRow, String> orderNumberCol;
 
 	@FXML
-	TableColumn<ShopOrdersTableRow, String> dateCol;
+	TableColumn<ShopOrdersTableRow, Timestamp> dateCol;
 
 	@FXML
 	TableColumn<ShopOrdersTableRow, String> amountCol;
@@ -88,12 +91,21 @@ public class OrdersController {
 	@FXML
 	TableColumn<ShopOrdersTableRow, Void> actionCol;
 
+
+	@FXML
+	TableColumn<ShopOrdersTableRow, String> orderImageColumn;
+
+	@FXML
+	TableColumn<ShopOrdersTableRow, String> colorColumn;
+
 	@FXML
 	public TableColumn<ShopOrdersTableRow, Boolean> selectionCol;
 
 	@FXML
 	private TableView<ShopOrdersTableRow> ordersTable;
 
+	@FXML
+	private Button testButton;
 
 	@FXML
 	ProgressIndicator statusLoadingIndicator;
@@ -124,17 +136,37 @@ public class OrdersController {
 	private ShopOrdersFilterModel filter = new ShopOrdersFilterModel();
 
 	public void initialize() {
-
+		OrdersController.instance = this;
 		if(orderNumberCol == null)
 			return;
-		
-		try {
 
-			orderNumberCol.setCellValueFactory(item -> new SimpleStringProperty(item.getValue().order.getOrderNumber()));
+		ordersTable.setRowFactory((table) -> {
+			TableRow<ShopOrdersTableRow> row = new TableRow<>();
+			return row;
+		});
+
+		try {
+			orderNumberCol.setCellValueFactory(item ->
+					new SimpleStringProperty(item.getValue().order.getOrderNumber()+"\r\n"
+					+item.getValue().order.getItemsShortDescription(3)));
 			orderNumberCol.setUserData("orderNumber");
 
-			dateCol.setCellValueFactory(
-					item -> new SimpleStringProperty(AppUtils.formatDateTime(item.getValue().order.getOrderTime())));
+			dateCol.setCellValueFactory(i -> new SimpleObjectProperty<>(i.getValue().order.getOrderTime()));
+
+			dateCol.setCellFactory(col -> {
+				TableCell<ShopOrdersTableRow, Timestamp> cell = new TableCell<ShopOrdersTableRow, Timestamp>() {
+					@Override
+					protected void updateItem(Timestamp item, boolean empty) {
+						super.updateItem(item, empty);
+						if(empty)
+							setText("");
+						else
+							setText(AppUtils.formatDateTime(item));
+					}
+				};
+				return cell;
+			});
+
 			dateCol.setUserData("orderTime");
 
 			amountCol.setCellValueFactory(item -> new SimpleStringProperty(
@@ -170,7 +202,6 @@ public class OrdersController {
 			var checkbox = new CheckBox();
 			checkbox.selectedProperty().addListener((obs, old, newVal) -> {
 				var ids = currentPageItems.stream().map(i -> i.order.getId()).collect(Collectors.toList());
-
 				if (newVal)
 					selectedOrderIds.addAll(ids);
 				else
@@ -195,10 +226,64 @@ public class OrdersController {
 				return new SimpleStringProperty(String.join(",", str));
 			});
 
+			colorColumn.setCellValueFactory(cell ->
+			{
+				var order = cell.getValue().order;
+				var clr = AppSettings.getString(AppSettings.TOKEN_COLOR_+order.getMarketplace()+"_"+order.dataSource.token.name, "#EEE");
+				return new SimpleStringProperty(clr);
+			});
+
+			colorColumn.setCellFactory(new Callback<>() {
+				@Override
+				public TableCell<ShopOrdersTableRow, String> call(
+						final TableColumn<ShopOrdersTableRow, String> param) {
+
+					var cell = new TableCell<ShopOrdersTableRow, String>() {
+						@Override
+						protected void updateItem(String item, boolean empty) {
+							setStyle("-fx-background-color:" + item + ";");
+						}
+					};
+					return cell;
+				}
+			});
+
+			orderImageColumn.setCellValueFactory(cell -> {
+				var order = cell.getValue().order;
+				var images = order.getProductImages();
+
+				return new SimpleStringProperty(images.length > 0 ? images[0] : null);
+			});
+
+			orderImageColumn.setCellFactory(new Callback<>() {
+				@Override
+				public TableCell<ShopOrdersTableRow, String> call(
+						final TableColumn<ShopOrdersTableRow, String> param) {
+
+					var cell = new TableCell<ShopOrdersTableRow, String>() {
+						@Override
+						protected void updateItem(String item, boolean empty) {
+							if(empty || Strings.isNullOrEmpty(item)) {
+								setGraphic(null);
+							}
+							else
+							{
+								try {
+									var img = AppUtils.getImageFromCache(item, AppUtils.ImageSize.SM);
+									ImageView imageView = new ImageView(AppUtils.convertWritableImage(img));
+									setGraphic(imageView);
+								} catch (IOException e) {
+									e.printStackTrace();
+								}
+							}
+						}
+					};
+					return cell;
+				}
+			});
 
 			actionCol.setCellFactory(
 				new Callback<TableColumn<ShopOrdersTableRow, Void>, TableCell<ShopOrdersTableRow, Void>>() {
-
 					@Override
 					public TableCell<ShopOrdersTableRow, Void> call(
 							final TableColumn<ShopOrdersTableRow, Void> param) {
@@ -257,11 +342,16 @@ public class OrdersController {
 							.map(t -> new TokenSelectModel(t, t.getName() + " | " + t.getOwner().platform, false)),
 					Arrays.stream(
 							new TokenSelectModel[] { new TokenSelectModel(null, "( ohne / manuell angelegt )", false),
-									new TokenSelectModel(null, "( alle )", true) }))
+							//		new TokenSelectModel(null, "( alle )", true)
+							}))
 					.toArray(TokenSelectModel[]::new);
-			marketplaceFilterSelect.setItems(FXCollections.observableArrayList(tokenSelectOptions));
-			marketplaceFilterSelect.getSelectionModel().select(tokenSelectOptions.length - 1);
-			entriesPerPageInput.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(5, 500, 20));
+			marketplaceFilterBox.getItems().addAll(tokenSelectOptions);
+			AppUtils.persistChanges(marketplaceFilterBox.getCheckModel(), "ordersOverviewFilter.tokenFilter");
+
+			var intFactory = new SpinnerValueFactory.IntegerSpinnerValueFactory(5, 500, 20);
+			AppUtils.persistChangesInt(intFactory.valueProperty(), "ordersOverViewFilter.entriesPerPageInput", 20);
+			entriesPerPageInput.setValueFactory(intFactory);
+
 
  			apiUpdateController.currentProgress.addListener((observableValue, number, t1) -> {
 				Platform.runLater(() -> {
@@ -269,20 +359,19 @@ public class OrdersController {
 				});
 			});
 
-			//setUpApiContols();
-
 			applyFilterValues();
 			updateSelectionInfoLabel();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-
 	}
+
+
 
 
 	public void applyFilterValues() {
 		filter.searchText = ((TextField) pageBorderPane.lookup("#searchInput")).getText();
-		filter.filterByToken = marketplaceFilterSelect.getValue();
+		filter.filterByToken = (marketplaceFilterBox.getCheckModel().getCheckedItems());
 		filter.entriesPerPage = entriesPerPageInput.getValue().intValue();
 		filter.onlyWithoutInvoice = ((CheckBox) pageBorderPane.lookup("#withoutInvoiceInput")).isSelected();
 		filter.orderStartDate = ((DatePicker) pageBorderPane.lookup("#filterStartDateInput")).getValue();
@@ -292,6 +381,8 @@ public class OrdersController {
 
 
 	private void updateOrdersView() {
+		AppUtils.log("updating orders view");
+
 		totalEntries = OrderDataAccess.count(filter);
 		
 		if(ordersPagination == null)
@@ -323,6 +414,8 @@ public class OrdersController {
 		}
 
 		updateSelectionInfoLabel();
+
+
 	}
 
 	private void updateSelectionInfoLabel() {
@@ -370,7 +463,7 @@ public class OrdersController {
 	}
 
 
-	public void handleGeneratePdfButton() {
+	public void handleGenerateInvoicesButton() {
 		AppUtils.generateOrderInvoices(selectedOrderIds.toArray(Long[]::new));
 	}
 
@@ -416,26 +509,33 @@ public class OrdersController {
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public void tableSortHandler(SortEvent<TableView<ShopOrdersTableRow>> event) {
-		String newSortField = filter.sortField;
-		SortType newSortType = filter.sortType;
 
 		TableColumn col = null;
+
 		if (ordersTable.getSortOrder().size() > 0) {
 			col = ordersTable.getSortOrder().get(0);
 
-			newSortField = (String) col.getUserData();
-			newSortType = col.getSortType();
+			filter.sortField = (String) col.getUserData();
+			filter.sortType = col.getSortType();
+
+			AppUtils.log("attempting to sort by "+filter.sortField+" ("+filter.sortType+")");
+		}
+		else {
+			AppUtils.log("resetting sort order");
+			filter.sortField = null;
+			filter.sortType = null;
 		}
 
-		if (filter.sortField.equals(newSortField) && filter.sortType == newSortType)
-			return;
+		//if (filter.sortField.equals(newSortField) && filter.sortType == newSortType)
+		//	return;
 
-		filter.sortField = newSortField;
-		filter.sortType = newSortType;
 
-		updateOrdersView();
-		ordersTable.getSortOrder().add(col);
-		event.consume();
+		//ordersTable.getSortOrder().add(col);
+		//ordersTable.getSortOrder().clear();
+
+		applyFilterValues();
+
+	//	event.consume();
 	}
 
 }

@@ -6,6 +6,7 @@ module com.salesinvoicetools.salesinvoicetools {
     requires javafx.media;
 
 
+
     requires org.controlsfx.controls;
     requires org.kordamp.ikonli.javafx;
     requires java.desktop;
@@ -26,6 +27,8 @@ module com.salesinvoicetools.salesinvoicetools {
     requires com.h2database;
     requires java.persistence;
     requires com.google.common;
+    requires org.apache.commons.lang3;
+
 
 
     opens com.salesinvoicetools;
@@ -40,5 +43,7 @@ module com.salesinvoicetools.salesinvoicetools {
     exports com.salesinvoicetools.controllers;
     exports  com.salesinvoicetools.dataaccess.models;
     exports  com.salesinvoicetools.utils;
+    opens com.salesinvoicetools.shopapis.ebay;
+    opens com.salesinvoicetools.shopapis.etsy;
 
-    }
+}

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+
+<VBox prefHeight="453.0" prefWidth="1083.0" xmlns="http://javafx.com/javafx/15.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.salesinvoicetools.controllers.StockItemsController">
+   <children>
+      <HBox>
+         <children>
+            <VBox fx:id="ItemDetailsContainer">
+               <children>
+                  <HBox>
+                     <children>
+                        <TextField fx:id="itemSearchInput" prefHeight="25.0" prefWidth="335.0" />
+                     </children>
+                     <padding>
+                        <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                     </padding>
+                  </HBox>
+                  <TableView prefHeight="418.0" prefWidth="720.0">
+                    <columns>
+                      <TableColumn id="selectionCol" fx:id="selectCol" minWidth="1.0" prefWidth="34.0" />
+                        <TableColumn id="imageCol" fx:id="imageCol" minWidth="1.0" prefWidth="34.0" />
+                      <TableColumn fx:id="titleCol" prefWidth="225.0" text="Bezeichnung" />
+                        <TableColumn fx:id="priceCol" prefWidth="76.0" text="Preis" />
+                        <TableColumn fx:id="stockCol" prefWidth="88.0" text="Verfügbar" />
+                        <TableColumn fx:id="liveCol" prefWidth="55.0" text="Live" />
+                        <TableColumn id="actionCol" fx:id="actionCol" prefWidth="41.0" />
+                    </columns>
+                  </TableView>
+               </children>
+            </VBox>
+            <VBox>
+               <children>
+                  <TextField fx:id="itemTitleFIeld" />
+               </children>
+            </VBox>
+         </children>
+      </HBox>
+   </children>
+</VBox>

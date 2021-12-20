@@ -1,4 +1,4 @@
-package com.salesinvoicetools.shopapis;
+package com.salesinvoicetools.shopapis.etsy;
 
 import com.github.scribejava.core.builder.ServiceBuilder;
 import com.github.scribejava.core.oauth.OAuth20Service;
@@ -8,9 +8,9 @@ import com.google.api.client.util.escape.UnicodeEscaper;
 import com.salesinvoicetools.dataaccess.DataAccessBase;
 import com.salesinvoicetools.dataaccess.ProductsDataAccess;
 import com.salesinvoicetools.models.*;
+import com.salesinvoicetools.shopapis.ShopApiBase;
 import com.salesinvoicetools.shopapis.oauth.EtsyApi20;
 import com.salesinvoicetools.utils.AppUtils;
-import com.salesinvoicetools.utils.ConsoleColors;
 import com.salesinvoicetools.utils.NetUtils;
 import com.salesinvoicetools.utils.Pagination;
 import javafx.beans.property.SimpleIntegerProperty;
@@ -19,7 +19,7 @@ import com.google.common.base.Charsets;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
-import com.salesinvoicetools.shopapis.ShopApiBase.*;
+
 import java.io.IOException;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -69,7 +69,7 @@ public class EtsyShopApi extends ShopApiBase {
 
 		var conn = NetUtils.openHttpURLConnection(EtsyApi20.instance().getAccessTokenEndpoint(),  "POST", params,null,"application/x-www-form-urlencoded" );
 		var response = NetUtils.getHttpConnectionContent(conn);
-		var accessTokenResponse = gson.fromJson(response, OAuth2TokenResponse.class);
+		var accessTokenResponse = gson.fromJson(response, Pojos.OAuth2TokenResponse.class);
 
 		if(conn.getResponseCode() != 200 || Strings.isNullOrEmpty(accessTokenResponse.access_token))
 			return false;
@@ -97,13 +97,13 @@ public class EtsyShopApi extends ShopApiBase {
 		return service;
 	}
 
-	public ReceiptResponse getShopReceipts(Calendar timeFrom, int offset, int limit, boolean onlyPaid) {
+	public Pojos.ReceiptResponse getShopReceipts(Calendar timeFrom, int offset, int limit, boolean onlyPaid) {
 
 		var shopResponse = getShop();
 		if(shopResponse == null)
 			return null;
 
-		var url = "shops/"+shopResponse.shop_id+"/receipts?min_created="+ timeFrom.toInstant().getEpochSecond()+"&limit="+limit+"&offset="+offset+"&client_id="+token.owner.clientSecret;
+		var url = "shops/"+shopResponse.shop_id+"/receipts?language=de&min_created="+ timeFrom.toInstant().getEpochSecond()+"&limit="+limit+"&offset="+offset+"&client_id="+token.owner.clientSecret;
 		AppUtils.log(url);
 
 		var content = this.makeAuthorizedApiCall(url, null, null);
@@ -111,7 +111,7 @@ public class EtsyShopApi extends ShopApiBase {
 		if(content == null)
 			return null;
 
-		var response = gson.fromJson(content, ReceiptResponse.class);
+		var response = gson.fromJson(content, Pojos.ReceiptResponse.class);
 
 		System.out.println("retrieved "+response.count+" receipts from ETSY");
 
@@ -122,7 +122,7 @@ public class EtsyShopApi extends ShopApiBase {
 	public List<ShopOrder> getOrdersPage(Calendar createTimeFrom, int pageNumber, int pageSize,
 			SimpleIntegerProperty outRemainingItems) throws Exception {
 
-		ReceiptResponse receipts = getShopReceipts(createTimeFrom, (pageNumber - 1) * pageSize, pageSize,false);
+		Pojos.ReceiptResponse receipts = getShopReceipts(createTimeFrom, (pageNumber - 1) * pageSize, pageSize,false);
 
 		AppUtils.log("retrieved "+receipts.results.size()+" of "+receipts.count+" receipts (page "+
 				pageNumber+", order time from "+createTimeFrom.toString()+")");
@@ -182,7 +182,7 @@ public class EtsyShopApi extends ShopApiBase {
 
 				var p = ProductsDataAccess.getNewOrExisting(Marketplace.ETSY, ""+t.product_id);
 
-				p.description = t.title;
+				p.title = t.title;
 				//p.description = t.description;
 				DataAccessBase.insertOrUpdate(p);
 
@@ -230,7 +230,7 @@ public class EtsyShopApi extends ShopApiBase {
 		String s = params;
 		var conn = NetUtils.openHttpURLConnection(EtsyApi20.instance().getAccessTokenEndpoint(),  "POST", s,null,"application/x-www-form-urlencoded" );
 		var response = NetUtils.getHttpConnectionContent(conn);
-		var accessTokenResponse = gson.fromJson(response, OAuth2TokenResponse.class);
+		var accessTokenResponse = gson.fromJson(response, Pojos.OAuth2TokenResponse.class);
 
 		if(conn.getResponseCode() != 200 || Strings.isNullOrEmpty(accessTokenResponse.access_token))
 			return false;
@@ -244,21 +244,26 @@ public class EtsyShopApi extends ShopApiBase {
 		return true;
 	}
 
-	private Shop getShop() {
+	private Pojos.Shop getShop() {
 		var shops = getShops(token.owner.clientId);
 		AppUtils.log( "shops found on etsy for shopname "+token.owner.clientId+":"+shops.count);
 		return getShops(token.owner.clientId).results.get(0);
 	}
 
-	private ShopsResponse getShops(String shopName) {
+	private Pojos.ShopsResponse getShops(String shopName) {
 		var response = this.makeAuthorizedApiCall("shops?shop_name="+shopName+"&limit=100&client_id="+token.owner.clientSecret, "GET", null);
 		//System.out.println(response);
-		return gson.fromJson(response, ShopsResponse.class);
+		return gson.fromJson(response, Pojos.ShopsResponse.class);
 	}
 
 	@Override
 	public ShopOrder getOrder(String orderNumer) {
 		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	public Product getProduct(String itemId) {
+		return null;
 	}
 
 	public void ping() {
@@ -269,166 +274,4 @@ public class EtsyShopApi extends ShopApiBase {
 		}
 	}
 
-
-	class OAuth2TokenResponse {
-		public String access_token;
-		public String token_type;
-		public long expires_in;
-		public String refresh_token;
-	}
-
-	class ReceiptResponse {
-		public int count;
-		public List<Receipt> results;
-	}
-
-	class ShopsResponse {
-		public int count;
-		public List<Shop> results;
-	}
-
-	public class MoneyAmount{
-		public long amount;
-		public long divisor;
-		public String currency_code;
-
-		@Override
-		public String toString() {
-			return AppUtils.formatCurrencyAmount(amount);
-		}
-	}
-
-	public class Variation{
-		public long property_id;
-		public long value_id;
-		public String formatted_name;
-		public String formatted_value;
-	}
-
-	public class Transaction{
-
-		@Override
-		public String toString() {
-			return "* "+quantity+" x "+price+" "+" | "+title+" *";
-		}
-
-		public long transaction_id;
-		public String title;
-		public String description;
-		public long seller_user_id;
-		public long buyer_user_id;
-		public long create_timestamp;
-		public long paid_timestamp;
-		public long shipped_timestamp;
-		public long quantity;
-		public long listing_image_id;
-		public long receipt_id;
-		public boolean is_digital;
-		public String file_data;
-		public long listing_id;
-		public String transaction_type;
-		public long product_id;
-		public String sku;
-		public MoneyAmount price;
-		public MoneyAmount shipping_cost;
-		public List<Variation> variations;
-		public long shipping_profile_id;
-		public long min_processing_days;
-		public long max_processing_days;
-		public String shipping_method;
-		public String shipping_upgrade;
-		public long expected_ship_date;
-	}
-
-	public class Receipt{
-
-		@Override
-		public String toString() {
-			return "*"+buyer_email+" : "+grandtotal+"*";
-		}
-
-		public long receipt_id;
-		public long receipt_type;
-		public long seller_user_id;
-		public String seller_email;
-		public long buyer_user_id;
-		public String buyer_email;
-		public String name;
-		public String first_line;
-		public String second_line;
-		public String city;
-		public String state;
-		public String zip;
-		public String status;
-		public String formatted_address;
-		public String country_iso;
-		public String payment_method;
-		public String payment_email;
-		public String message_from_seller;
-		public String message_from_buyer;
-		public String message_from_payment;
-		public boolean is_paid;
-		public boolean is_shipped;
-		public long create_timestamp;
-		public long update_timestamp;
-		public String gift_message;
-		public MoneyAmount grandtotal;
-		public MoneyAmount subtotal;
-		public MoneyAmount total_price;
-		public MoneyAmount total_shipping_cost;
-		public MoneyAmount total_tax_cost;
-		public MoneyAmount total_vat_cost;
-		public MoneyAmount discount_amt;
-		public MoneyAmount gift_wrap_price;
-		public List<Object> shipments;
-		public List<Transaction> transactions;
-	}
-
-	public class Shop{
-		public long shop_id;
-		public long user_id;
-		public String shop_name;
-		public long create_date;
-		public String title;
-		public String announcement;
-		public String currency_code;
-		public boolean is_vacation;
-		public String vacation_message;
-		public String sale_message;
-		public String digital_sale_message;
-		public long update_date;
-		public long listing_active_count;
-		public long digital_listing_count;
-		public String login_name;
-		public boolean accepts_custom_requests;
-		public String policy_welcome;
-		public String policy_payment;
-		public String policy_shipping;
-		public String policy_refunds;
-		public String policy_additional;
-		public String policy_seller_info;
-		public long policy_update_date;
-		public boolean policy_has_private_receipt_info;
-		public boolean has_unstructured_policies;
-		public String policy_privacy;
-		public String vacation_autoreply;
-		public String url;
-		public String image_url_760x100;
-		public long num_favorers;
-		public List<String> languages;
-		public String icon_url_fullxfull;
-		public boolean is_using_structured_policies;
-		public boolean has_onboarded_structured_policies;
-		public boolean include_dispute_form_link;
-		public boolean is_direct_checkout_onboarded;
-		public boolean is_etsy_payments_onboarded;
-		public boolean is_calculated_eligible;
-		public boolean is_opted_in_to_buyer_promise;
-		public boolean is_shop_us_based;
-		public long transaction_sold_count;
-		public String shipping_from_country_iso;
-		public String shop_location_country_iso;
-		public long review_count;
-		public double review_average;
-	}
 }

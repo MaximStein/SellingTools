@@ -20,6 +20,7 @@
       <CheckComboBox fx:id="apiPlatformSelect" prefWidth="180.0" />
       <ProgressBar fx:id="progressBar" prefWidth="180.0" progress="0.0" VBox.vgrow="ALWAYS" />
       <Label fx:id="statusLabel" />
+      <Button fx:id="testButton" mnemonicParsing="false" text="test" />
    </children>
    <padding>
       <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />

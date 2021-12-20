@@ -1,5 +1,7 @@
 package com.salesinvoicetools.models;
 
+import com.salesinvoicetools.utils.AppUtils;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -87,10 +89,12 @@ public class LineItem {
 		this.variation = variation;
 	}
 
-	public BigDecimal getSingleItemAmount() {
-		return new BigDecimal(1d * totalPriceGross / quantity / 100).setScale(2, RoundingMode.CEILING);
+	public long getSingleItemAmount() {
+		return (long)Math.round(1d * totalPriceGross / quantity);
 	}
-	
-	
+
+	public String getSingleItemAmountString() {
+		return AppUtils.formatCurrencyAmount(getSingleItemAmount());
+	}
 	
 }

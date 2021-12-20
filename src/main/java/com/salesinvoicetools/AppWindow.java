@@ -1,20 +1,12 @@
 package com.salesinvoicetools;
 
 import java.io.IOException;
-import java.sql.Timestamp;
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
-import java.util.concurrent.ExecutionException;
 
 
 import com.salesinvoicetools.dataaccess.DataAccessBase;
-import com.salesinvoicetools.controllers.AppSettingsController;
-import com.salesinvoicetools.dataaccess.DataAccessBase;
-import com.salesinvoicetools.shopapis.EtsyShopApi;
+import com.salesinvoicetools.shopapis.etsy.EtsyShopApi;
 import com.salesinvoicetools.shopapis.ShopApiBase;
-import com.salesinvoicetools.utils.AppUtils;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleIntegerProperty;
@@ -23,28 +15,17 @@ import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
-import javafx.scene.web.WebView;
 import javafx.stage.Stage;
 import javafx.stage.WindowEvent;
-import com.salesinvoicetools.models.Address;
-import com.salesinvoicetools.models.ApiAccess;
 import com.salesinvoicetools.models.AppConfiguration;
-import com.salesinvoicetools.models.BankInfo;
-import com.salesinvoicetools.models.ContactInfo;
-import com.salesinvoicetools.models.DataSource;
-import com.salesinvoicetools.models.LineItem;
 import com.salesinvoicetools.models.OAuth2Token;
-import com.salesinvoicetools.models.OrderInvoice;
-import com.salesinvoicetools.models.Product;
 import com.salesinvoicetools.models.ShopOrder;
-import com.salesinvoicetools.shopapis.ShopApiBase.*;
-import org.controlsfx.control.Notifications;
-import org.h2.store.Data;
 
 public class AppWindow extends Application {
 
 	public static Stage stage;
-	
+	public static AppWindow instance;
+
 	@Override
 	public void start(Stage primaryStage) throws IOException {
 		AppWindow.stage = primaryStage;

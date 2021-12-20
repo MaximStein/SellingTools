@@ -31,7 +31,6 @@ import javafx.scene.control.TableColumn.CellEditEvent;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.cell.TextFieldTableCell;
-import javafx.scene.layout.GridPane;
 import javafx.stage.Stage;
 import javafx.util.converter.LongStringConverter;
 import javafx.util.converter.NumberStringConverter;
@@ -140,7 +139,7 @@ public class OrderDetailsController {
 
 		itemDescriptionColumn.setCellFactory(TextFieldTableCell.forTableColumn());
 		itemDescriptionColumn
-				.setCellValueFactory(item -> new SimpleStringProperty(item.getValue().getProduct().getDescription()));
+				.setCellValueFactory(item -> new SimpleStringProperty(item.getValue().getProduct().getTitle()));
 		itemDescriptionColumn.setOnEditCommit(this::editCommit);
 
 		itemTotalPriceColumn
@@ -279,7 +278,7 @@ public class OrderDetailsController {
 
 		switch (colId) {
 		case "itemDescriptionColumn":
-			item.getProduct().setDescription((String) e.getNewValue());
+			item.getProduct().setTitle((String) e.getNewValue());
 			break;
 		case "itemTotalPriceColumn":
 			item.setTotalPriceGross(Math.round(100d * (double) e.getNewValue()));

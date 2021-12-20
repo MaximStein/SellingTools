@@ -2,19 +2,16 @@ package com.salesinvoicetools.dataaccess;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import javax.persistence.NoResultException;
-import javax.persistence.criteria.CriteriaQuery;
-import javax.persistence.criteria.Join;
-import javax.persistence.criteria.JoinType;
-import javax.persistence.criteria.Order;
-import javax.persistence.criteria.Predicate;
-import javax.persistence.criteria.Root;
+import javax.persistence.criteria.*;
 
 import com.google.api.client.util.Strings;
 
@@ -93,16 +90,20 @@ public class OrderDataAccess extends DataAccessBase {
 					Timestamp.valueOf(filter.orderStartDate.atStartOfDay())));
 		}
 
-		if (filter.filterByToken != null && !filter.filterByToken.any) {
-			var token = filter.filterByToken.token;
-			if (token != null) {
-				Join<DataSource, ShopOrder> dataUpdate = root.join("dataSource", JoinType.LEFT);
-				filterPredicates.add(builder.and(builder.isNotNull(root.get("dataSource")),
-						builder.equal(dataUpdate.get("token"), token)));
-			} else {
-				filterPredicates.add(builder.isNull(root.get("dataSource")));
-			}
+		if (filter.filterByToken != null && filter.filterByToken.size() > 0) {
+			Join<DataSource, ShopOrder> dataUpdate = root.join("dataSource", JoinType.LEFT);
+			var tokens = filter.filterByToken;
+			var tokenFilterPredicates = new ArrayList<Predicate>();
 
+			tokens.stream().forEach(t -> {
+				if(t.token != null) {
+					tokenFilterPredicates.add(builder.equal(dataUpdate.get("token"), t.token));
+				} else {
+					tokenFilterPredicates.add(builder.isNull(root.get("dataSource")));
+				}
+			});
+
+			filterPredicates.add(builder.or(tokenFilterPredicates.toArray(new Predicate[0])));
 		}
 
 		return filterPredicates;
@@ -132,7 +133,7 @@ public class OrderDataAccess extends DataAccessBase {
 		if (Strings.isNullOrEmpty(filter.sortField)) {
 			query.orderBy(builder.desc(root.get("orderNumber")));
 		} else {
-			var path = root.get(filter.sortField);
+			Path<Object> path = root.get(filter.sortField);
 			query.orderBy(filter.sortType == SortType.ASCENDING ? builder.asc(path) : builder.desc(path));
 		}
 

@@ -2,28 +2,40 @@ package com.salesinvoicetools.utils;
 
 import com.google.api.client.repackaged.com.google.common.base.Strings;
 import com.salesinvoicetools.controllers.AppController;
-import com.salesinvoicetools.dataaccess.AppConfigDataAccess;
+import com.salesinvoicetools.dataaccess.AppSettings;
+import static com.salesinvoicetools.dataaccess.AppSettings.*;
 import com.salesinvoicetools.dataaccess.DataAccessBase;
 import com.salesinvoicetools.dataaccess.OrderDataAccess;
 import com.salesinvoicetools.models.Address;
 import com.salesinvoicetools.models.ShopOrder;
 import javafx.beans.property.DoubleProperty;
-import javafx.beans.value.ObservableValue;
+import javafx.beans.property.IntegerProperty;
+import javafx.beans.property.ObjectProperty;
 import javafx.collections.ListChangeListener;
-import javafx.collections.ObservableList;
+import javafx.geometry.Pos;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.ButtonBar.ButtonData;
 import javafx.scene.control.ButtonType;
+import javafx.scene.image.PixelWriter;
+import javafx.scene.image.WritableImage;
 import javafx.util.Duration;
 import javafx.util.converter.NumberStringConverter;
 import org.controlsfx.control.IndexedCheckModel;
 import org.controlsfx.control.Notifications;
-import com.salesinvoicetools.shopapis.ShopApiBase.*;
+
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
 import java.math.BigInteger;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Timestamp;
 import java.text.NumberFormat;
 import java.text.ParseException;
@@ -31,10 +43,10 @@ import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 public class AppUtils {
 	
@@ -54,15 +66,28 @@ public class AppUtils {
 		if(selectedShopOrderIds.length > 1) {
 			Alert alert = new Alert(AlertType.CONFIRMATION);
 			alert.setContentText(
-					"PDFs f�r " + selectedShopOrderIds.length + " Bestellungen in das Verzeichnis "
-					+ AppConfigDataAccess.getAppConfig().getInvoiceDirectory()+" erzeugen?");
+					"PDFs für " + selectedShopOrderIds.length + " Bestellungen in Verzeichnis "
+					+ AppSettings.getAppConfig().getInvoiceDirectory()+" speichern?");
 			ButtonType okButton = new ButtonType("Ok", ButtonData.OK_DONE);
 			ButtonType cancelButton = new ButtonType("Abbrechen", ButtonData.CANCEL_CLOSE);
 			alert.getButtonTypes().setAll(okButton, cancelButton);
-			
+
 			alert.showAndWait().ifPresent(type -> {
 				if (type == okButton) {
-					Arrays.stream(selectedShopOrderIds).forEach(id -> AppUtils.generateOrderInvoice(id));
+					var map = new HashMap<Long, ShopOrder>();
+					Arrays.stream(selectedShopOrderIds).forEach(id -> {
+						var order = (ShopOrder)DataAccessBase.find(ShopOrder.class, id);
+						var invoiceNumber = AppUtils.getOrGenerateInvoiceNumber(order);
+						map.put(invoiceNumber,order);
+						OrderDataAccess.insertOrUpdateInvoiceData(order, invoiceNumber);
+					});
+					//Arrays.stream(selectedShopOrderIds).forEach(id -> AppUtils.generateOrderInvoice(id));
+					if(PDFUtils.createInvoicesFile(map)) {
+						AppUtils.showNotificationInfo("fertig", "Rechnungen wurden erstellt" );
+					}
+					else {
+						AppUtils.showNotificationInfo("fertig", "Rechnungen konnten nicht erstellt werden");
+					}
 				}
 			});			
 		} 
@@ -70,7 +95,24 @@ public class AppUtils {
 			Arrays.stream(selectedShopOrderIds).forEach(id -> AppUtils.generateOrderInvoice(id));
 		}		
 	}
-	
+
+
+	public static long getOrGenerateInvoiceNumber(ShopOrder order) {
+		Integer invoiceNumber = AppSettings.getInt(CURRENT_INVOICE_NUMBER);
+		if(invoiceNumber == null)
+			invoiceNumber = 0;
+
+		if(order.getInvoice() == null) {
+			invoiceNumber++;
+			AppSettings.setInt(CURRENT_INVOICE_NUMBER, invoiceNumber);
+		}
+		else {
+			invoiceNumber = Math.toIntExact(order.getInvoice().getInvoiceNumber());
+		}
+
+		return invoiceNumber;
+	}
+
 	/**
 	 * generates an invoice inside the user-defined output directory, showing an error alert if none is defined
 	 * @param orderId
@@ -78,11 +120,11 @@ public class AppUtils {
 	 */
 	public static Long generateOrderInvoice(long orderId) {
 		
-		var config = AppConfigDataAccess.getAppConfig();
+		var config = AppSettings.getAppConfig();
 		if(Strings.isNullOrEmpty(config.getInvoiceDirectory())) {
 			Alert alert = new Alert(AlertType.ERROR);
 			alert.setContentText(
-					"Es wurde noch kein Zielverzeichnis f�r PDF-Dateien in den Einstellungen festgelegt");
+					"Es wurde noch kein Zielverzeichnis für PDF-Dateien in den Einstellungen festgelegt");
 			alert.show();	
 		}
 		
@@ -90,24 +132,15 @@ public class AppUtils {
 		if(order == null)
 			return null;
 
-		OrderDataAccess.getInvoiceNumber(order);
-		
-		long invoiceNumber;
-		
-		if(order.getInvoice() == null) {
-			invoiceNumber = config.getIncrementedInvoiceNumber();
-		}
-		else {
-			invoiceNumber = order.getInvoice().getInvoiceNumber();
-		}		
-		
-		
+		//OrderDataAccess.getInvoiceNumber(order);
+		var invoiceNumber = AppUtils.getOrGenerateInvoiceNumber(order);
+
 		if (!PDFUtils.createInvoiceFile(order, config, invoiceNumber)) {			
 			if(order.getInvoice() == null)
 				config.setCurrentInvoiceNumber(config.getCurrentInvoiceNumber()-1);
 			
 			var message = "Die Datei konnte nicht erstellt werden."
-					+ "\r\nBitte pr�fen Sie die Schreibberechtigungen f�r das Zielverzeichnis:\r\n"
+					+ "\r\nBitte prüfen Sie die Schreibberechtigungen für das Zielverzeichnis:\r\n"
 					+ config.getInvoiceDirectory();
 			new Alert(AlertType.ERROR, message).show();
 			return null;
@@ -129,6 +162,8 @@ public class AppUtils {
 	public static String getParameterVal(String urlStr, String name) throws MalformedURLException {
 		
 		var url = new URL(urlStr);
+		if(url.getQuery() == null)
+			return null;
 		var parts = url.getQuery().split("(//?|&)");
 		for(var part : parts) {
 			var keyVal = part.split("=");
@@ -146,7 +181,7 @@ public class AppUtils {
 	/**
 	 * 
 	 * @param cents
-	 * @return the currency-formatted amount, e.g. 12,49 �
+	 * @return the currency-formatted amount, e.g. 12,49 €
 	 */
 	public static String formatCurrencyAmount(long cents) {
 		return formatCurrencyAmount(cents, "EUR");
@@ -159,6 +194,32 @@ public class AppUtils {
 	 */
 	public static String formatDateTime(Timestamp ts) {
 		return ts == null ? "" : new SimpleDateFormat("dd.MM.yyyy hh:mm").format(ts);
+	}
+
+	/**
+	 *
+	 * @param i
+	 * @return the full date and time value with hours and seconds
+	 */
+	public static String formatTimeOfDay(Instant i) {
+		DateTimeFormatter dtf = DateTimeFormatter.ofPattern("HH:mm:ss")
+				.withZone(ZoneId.systemDefault());
+
+
+		return i == null ? "" : dtf.format(i);
+	}
+
+	public static String shortenString(String str, int leftLenght, int rightLength) {
+		var newString = "";
+
+		if(str.length() <= leftLenght+rightLength)
+			return str;
+
+		rightLength = Math.min(str.length() - leftLenght, rightLength);
+
+		newString += str.substring(0, leftLenght)+".."+str.substring(str.length()-rightLength);
+
+		return newString;
 	}
 
 	public static String formatDateTime(Instant i) {
@@ -226,13 +287,38 @@ public class AppUtils {
 		var parts = path.split(pattern);
 		return parts[parts.length-1];
 	}
-	
-	public static void showNotification(String title, String content) {
-		Notifications.create()
-				.title(title)
-				.text(content)
-				.hideAfter(Duration.seconds(7))
-				.show();
+
+
+
+	public static void showNotificationError(String title, String content) {
+
+	}
+
+	public static void showNotificationInfo(String title, String content) {
+		AppUtils.showNotification(title,content, NotificationType.INFO );
+	}
+
+	public enum NotificationType { INFO, ERROR,CONFIRM, WARNING}
+	public static void showNotification(String title, String content, NotificationType t) {
+			var notification = Notifications.create()
+					.title(title)
+					.text(content)
+					.position(Pos.BOTTOM_CENTER)
+					.hideAfter(Duration.seconds(7));
+			switch(t) {
+				case ERROR:
+					notification.showError();
+				break;
+				case INFO:
+					notification.showInformation();
+					break;
+				case CONFIRM:
+					notification.showConfirm();
+					break;
+				case WARNING:
+					notification.showWarning();
+					break;
+			}
 	}
 
 
@@ -270,11 +356,13 @@ public class AppUtils {
 		catch(IllegalArgumentException e) {
 			return Address.Country.OTHER;
 		}
+
 	}
 
-	public static void persistChanges(IndexedCheckModel<Marketplace> val, String key) {
 
-		var current = AppConfigDataAccess.getSetting(key);
+	public static void persistChanges(IndexedCheckModel val, String key) {
+
+		var current = AppSettings.getString(key);
 
 		val.clearChecks();
 		if(current != null) {
@@ -286,42 +374,126 @@ public class AppUtils {
 			@Override
 			public void onChanged(Change<? extends Integer> change) {
 				var vals = val.getCheckedIndices().stream().map(i -> ""+i).collect(Collectors.joining(","));
-				AppConfigDataAccess.setSetting(key, vals);
+				AppSettings.setString(key, (String) vals);
 			}
 		});
 	}
 
+	public static void persistChangesInt(IntegerProperty val, String key, Integer defaultValue) {
+		val.addListener(((observableValue, o, n) -> {
+			AppSettings.setInt(key, n.intValue());
+		}));
+		var currentValue = AppSettings.getDouble(key);
+		val.setValue(currentValue == null ? defaultValue : currentValue);
+	}
+
 	public static void persistChangesDouble(DoubleProperty val, String key, Double defaultValue) {
 		val.addListener(((observableValue, o, n) -> {
-			AppConfigDataAccess.setSettingDouble(key, n.doubleValue());
+			AppSettings.setDouble(key, n.doubleValue());
 		}));
-		var currentValue = AppConfigDataAccess.getSettingDouble(key);
+		var currentValue = AppSettings.getDouble(key);
 		val.setValue(currentValue == null ? defaultValue : currentValue);
 	}
 
 	public static void log(String message) {
+		log(message,Color.LIGHT_GRAY);
+	}
+
+	public static void log(String message, Color color) {
+
 		StackTraceElement[] stackTraceElements = Thread.currentThread().getStackTrace();
 		var className = stackTraceElements[2].getClassName();
 
 		try {
 			var c =  Class.forName(className);
-			var f = c.getField("LOG_COLOR");
-			var clr = (String)f.get(null);
-			System.out.print(clr);
 
-			AppController.instance.log(clr,className,message);
+			if(AppController.instance != null)
+				AppController.instance.log(String.format("#%08X", color.getRGB()),className,message);
 
-		} catch (NoSuchFieldException | IllegalAccessException | ClassNotFoundException e) {
-			AppController.instance.log(className,message);
-			//System.err.println("couldnt apply color to class "+className);
+		} catch ( ClassNotFoundException e) {
+			if(AppController.instance != null)
+				AppController.instance.log(className,message);
 		}
 
 		System.out.println("["+className+"]: "+message);
 		System.out.print(ConsoleColors.RESET);
 
 	}
+	public static void log(String msg, int indents, Color color) {
+		log(Strings.repeat("	",indents)+msg, color);
+	}
 
 	public static void log(String msg, int indents) {
-		log(Strings.repeat("	",indents)+msg);
+		log(msg, indents, Color.lightGray);
+	}
+
+	public static String toRGBCode( javafx.scene.paint.Color color )
+	{
+		return String.format( "#%02X%02X%02X",
+				(int)( color.getRed() * 255 ),
+				(int)( color.getGreen() * 255 ),
+				(int)( color.getBlue() * 255 ) );
+	}
+
+	public static void persistChangesInt(ObjectProperty<Integer> val, String key,Integer defaultValue) {
+		val.addListener(((observableValue, o, n) -> {
+			AppSettings.setString(key, n.toString());
+		}));
+
+		var currentValue = AppSettings.getInt(key);
+		val.setValue(currentValue == null ? defaultValue : currentValue);
+	}
+
+
+	public static WritableImage convertWritableImage(BufferedImage bf){
+		WritableImage wr = null;
+		if (bf != null) {
+			wr = new WritableImage(bf.getWidth(), bf.getHeight());
+			PixelWriter pw = wr.getPixelWriter();
+			for (int x = 0; x < bf.getWidth(); x++) {
+				for (int y = 0; y < bf.getHeight(); y++) {
+					pw.setArgb(x, y, bf.getRGB(x, y));
+				}
+			}
+		}
+		return wr;
+	}
+
+	public static BufferedImage resizeImage(BufferedImage originalImage, int targetWidth, int targetHeight) throws IOException {
+		BufferedImage resizedImage = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
+		Graphics2D graphics2D = resizedImage.createGraphics();
+		graphics2D.drawImage(originalImage, 0, 0, targetWidth, targetHeight, null);
+		graphics2D.dispose();
+		return resizedImage;
+	}
+
+
+	public enum ImageSize { SM, ORIGINAL }
+	public static BufferedImage getImageFromCache(String fileName, ImageSize size) throws IOException {
+
+		var convertedFileName = fileName.replace("/", ".").replace(":","__");
+		var cacheDir = AppSettings.getString(APP_DATA_DIRECTORY,".")+"/cache/"+size;
+
+		BufferedImage bufferedImage = null;
+
+		if(!Files.exists(Path.of(cacheDir+"/"+convertedFileName))){
+			System.out.println(cacheDir+"/"+convertedFileName);
+			Files.createDirectories(Path.of(cacheDir));
+
+			if(fileName.startsWith("http://") || fileName.startsWith("https://")) {
+				bufferedImage =  ImageIO.read(new URL(fileName));
+			}
+			else if(Files.exists(Path.of(fileName))) {
+				bufferedImage = ImageIO.read(new File(fileName));
+			}
+			else {
+				return null;
+			}
+
+			ImageIO.write(AppUtils.resizeImage(bufferedImage,60,60), "jpg", new File(cacheDir + "/" + convertedFileName));
+
+		}
+		return ImageIO.read(new File(cacheDir+"/"+convertedFileName));
+
 	}
 }

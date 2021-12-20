@@ -9,8 +9,10 @@ import javafx.scene.control.TabPane;
 import javafx.scene.layout.AnchorPane;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.web.WebView;
+import org.apache.commons.lang3.StringUtils;
 
-;import java.time.Instant;
+;import java.awt.datatransfer.StringSelection;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -23,8 +25,9 @@ import java.util.List;
  */
 public class AppController {
 
+
 	@FXML
-	BorderPane ordersOverviewPage;
+	public BorderPane ordersOverviewPage;
 
 	@FXML
 	AnchorPane ordersPane;
@@ -83,16 +86,16 @@ public class AppController {
 
 		Platform.runLater(() -> {
 
-
-
 		var e = logWebView.getEngine();
-		var t = AppUtils.formatDateTime(Instant.now());
+		var t = AppUtils.formatTimeOfDay(Instant.now());
 
 		if(logContent.size() > 1000) {
 			logContent.removeFirst();
 		}
 
-		logContent.add("<div><span class=time>["+t+"</span> <span class=tag>|"+tag+"]</span>  " +
+		var paddedTag = StringUtils.leftPad(AppUtils.shortenString(tag,0, 28), 30, ".");
+
+		logContent.add("<div><span class=time>["+t+"</span> <span class=tag>| "+paddedTag+"]</span>  " +
 				"<span class=content style='color:"+color+"'>"+content+"</span></div>");
 
 

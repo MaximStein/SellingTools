@@ -2,37 +2,32 @@ package com.salesinvoicetools.shopapis;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
-import java.net.URLDecoder;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Calendar;
-import java.util.Collection;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
-import com.github.scribejava.core.builder.ServiceBuilder;
-import com.github.scribejava.core.builder.api.DefaultApi20;
 import com.github.scribejava.core.oauth.OAuth20Service;
 
-import com.google.api.client.http.HttpMethods;
 import com.google.gson.Gson;
 import com.salesinvoicetools.dataaccess.DataAccessBase;
 import com.salesinvoicetools.dataaccess.DataUpdateDataAccess;
 import com.salesinvoicetools.dataaccess.OrderDataAccess;
 import com.salesinvoicetools.models.DataSource;
 import com.salesinvoicetools.models.OAuth2Token;
+import com.salesinvoicetools.models.Product;
 import com.salesinvoicetools.models.ShopOrder;
-import com.salesinvoicetools.shopapis.oauth.EtsyApi20;
+import com.salesinvoicetools.shopapis.ebay.EbayShopApi;
+import com.salesinvoicetools.shopapis.etsy.EtsyShopApi;
 import com.salesinvoicetools.utils.AppUtils;
 import com.salesinvoicetools.utils.NetUtils;
 import javafx.application.Platform;
 import javafx.beans.property.DoubleProperty;
-import javafx.beans.property.SimpleBooleanProperty;
 import javafx.beans.property.SimpleIntegerProperty;
-import javafx.beans.value.ObservableIntegerValue;
 
 /**
  * base class for API-implementations; create a subclass to implement specific API-support
@@ -43,8 +38,8 @@ import javafx.beans.value.ObservableIntegerValue;
  */
 public abstract class ShopApiBase {
 
-	OAuth2Token token = null;
-	boolean isSandbox = false;
+	protected  OAuth2Token token = null;
+	protected  boolean isSandbox = false;
 
 	protected Gson gson = new Gson();
 
@@ -84,6 +79,7 @@ public abstract class ShopApiBase {
 						DataAccessBase.insertOrUpdate(o);
 					}
 					else {
+						existing.totalGrossAmount = o.totalGrossAmount;
 						existing.paymentComplete = o.paymentComplete;
 						existing.shippedTime = o.shippedTime;
 						existing.refundAmount = o.refundAmount;
@@ -189,9 +185,7 @@ public abstract class ShopApiBase {
 
 		if(accessToken == null)
 			return false;
-						
-		System.out.println("access token: "+ accessToken.getRawResponse());				
-		
+
 		token.setAccessToken(accessToken.getAccessToken());
 		token.setRefreshToken(accessToken.getRefreshToken());
 		token.setAcessTokenExpirationTime(Date
@@ -217,6 +211,8 @@ public abstract class ShopApiBase {
 	public abstract List<ShopOrder> getOrdersPage(Calendar createTimeFrom, int pageNumber, int pageSize, SimpleIntegerProperty outRemainingItems) throws Exception;
 	
 	public abstract ShopOrder getOrder(String orderNumer);
+
+	public abstract Product getProduct(String itemId);
 
 	public abstract String getApiBaseUrl();
 

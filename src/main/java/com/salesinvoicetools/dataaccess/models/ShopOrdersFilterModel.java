@@ -3,6 +3,7 @@ package com.salesinvoicetools.dataaccess.models;
 import java.time.LocalDate;
 
 import com.salesinvoicetools.viewmodels.TokenSelectModel;
+import javafx.collections.ObservableList;
 import javafx.scene.control.TableColumn.SortType;
 
 
@@ -20,7 +21,7 @@ public class ShopOrdersFilterModel {
 	public SortType sortType;
 	
 	public boolean onlyWithoutInvoice = false;
-	public TokenSelectModel filterByToken;
+	public ObservableList<TokenSelectModel> filterByToken;
 	
 	public LocalDate orderStartDate = null;
 	

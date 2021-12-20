@@ -31,6 +31,17 @@ public class AddressController {
 	 * @param a
 	 */
 	public void setAddress(Address a) {
+		if(a == null)
+		{
+			nameInput.clear();
+			addressAdditionInput.clear();
+			streetInput.clear();
+			zipInput.clear();
+			cityInput.clear();
+			countryInput.clear();
+			return;
+		}
+
 		nameInput.setText(a.getName());
 		addressAdditionInput.setText(a.getAdditionalInfo());
 		streetInput.setText(a.getStreet());
@@ -58,6 +69,7 @@ public class AddressController {
 	 * @param a 
 	 */
 	public void saveToAddress(Address a) {
+
 		a.setName(nameInput.getText());
 		a.setCity(cityInput.getText());
 		a.setAdditionalInfo(addressAdditionInput.getText());

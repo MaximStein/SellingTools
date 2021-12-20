@@ -2,8 +2,12 @@ package com.salesinvoicetools.controllers;
 
 
 import com.salesinvoicetools.AppWindow;
+import com.salesinvoicetools.dataaccess.AppSettings;
+import static com.salesinvoicetools.dataaccess.AppSettings.*;
 import com.salesinvoicetools.dataaccess.DataAccessBase;
+import com.salesinvoicetools.models.Address;
 import com.salesinvoicetools.models.AppConfiguration;
+import com.salesinvoicetools.models.BankInfo;
 import com.salesinvoicetools.utils.AppUtils;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
@@ -45,7 +49,7 @@ public class AppSettingsController {
 	CheckBox emailOnInvoiceCheckbox;
 	
 	@FXML
-	TextField invoiceDirectoryInput;
+	TextField appDataDirectoryInput;
 
 	@FXML 
 	Spinner<Integer> invoiceNumberInput;
@@ -58,37 +62,52 @@ public class AppSettingsController {
 
 		settings = (AppConfiguration) DataAccessBase.getAll(AppConfiguration.class).get(0);
 
-		addressController.setAddress(settings.getAddress());
-		kleinunternehmerTextInput.setText(settings.getKleinunternehmerInfoText());
-		zusatztextInput.setText(settings.getAdditionalText());
-		ustIdInput.setText(settings.getVatNumber());
-		bankNameInput.setText(settings.getBankInfo().getBankName());
-		ibanInput.setText(settings.getBankInfo().getIban());
-		bicInput.setText(settings.getBankInfo().getBic());
-		bankOnInvoiceCheckbox.setSelected(settings.isBankInfoOnInvoice());
-		emailOnInvoiceCheckbox.setSelected(settings.isEmailOnInvoice());
-		invoiceDirectoryInput.setText(settings.getInvoiceDirectory());
-		defaultTaxInput.setText(AppUtils.numberStringConverter.toString(settings.getDefaultTax()));
+		addressController.setAddress(AppSettings.get(INVOICE_ADDRESS, Address.class));
+
+		kleinunternehmerTextInput.setText(AppSettings.getString(KLEINUNTERNEHMER_INFO));
+
+		zusatztextInput.setText(AppSettings.getString(INVOICE_ADDITIONAL_TEXT));
+
+		ustIdInput.setText(AppSettings.getString(VAT_ID));
+
+		var bankInfo = AppSettings.get(BANK_INFO, BankInfo.class);
+		if(bankInfo != null) {
+			bankNameInput.setText(bankInfo.bankName);
+			ibanInput.setText(bankInfo.bankName);
+			bicInput.setText(bankInfo.bic);
+		}
+
+		bankOnInvoiceCheckbox.setSelected(AppSettings.getBoolean(BANK_INFO_ON_INVOICE, false));
+
+		emailOnInvoiceCheckbox.setSelected(AppSettings.getBoolean(EMAIL_ON_INVOICE, false));
+
+		appDataDirectoryInput.setText(AppSettings.getString(AppSettings.APP_DATA_DIRECTORY));
+
+		defaultTaxInput.setText(AppUtils.numberStringConverter.toString(AppSettings.getDouble(DEFAULT_TAX)));
 		
-		invoiceNumberInput.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(1, Integer.MAX_VALUE, settings.getCurrentInvoiceNumber()+1));		
+		invoiceNumberInput.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(
+				1,
+				Integer.MAX_VALUE,
+				AppSettings.getInt(CURRENT_INVOICE_NUMBER, 1)+1));
 
 	}
 
 	public void handleSaveButton() {
-		addressController.saveToAddress(settings.getAddress());
-		settings.setKleinunternehmerInfoText(kleinunternehmerTextInput.getText());
-		settings.setAdditionalText(zusatztextInput.getText());
-		settings.setVatNumber(ustIdInput.getText());
-		settings.getBankInfo().setBankName(bankNameInput.getText());
-		settings.getBankInfo().setIban(ibanInput.getText());
-		settings.getBankInfo().setBic(bicInput.getText());
-		settings.setBankInfoOnInvoice(bankOnInvoiceCheckbox.isSelected());
-		settings.setEmailOnInvoice(emailOnInvoiceCheckbox.isSelected());
-		settings.setInvoiceDirectory(invoiceDirectoryInput.getText());
-		settings.setCurrentInvoiceNumber(invoiceNumberInput.getValue()-1);
+		var addr = AppSettings.get(INVOICE_ADDRESS,Address.class, new Address());
+		addressController.saveToAddress(addr);
+		AppSettings.setString(INVOICE_ADDRESS, addr, Address.class);
+		AppSettings.setString(KLEINUNTERNEHMER_INFO, kleinunternehmerTextInput.getText());
+		AppSettings.setString(INVOICE_ADDITIONAL_TEXT, zusatztextInput.getText());
+		AppSettings.setString(VAT_ID, ustIdInput.getText());
+		AppSettings.setString(BANK_INFO, new BankInfo(bankNameInput.getText(), ibanInput.getText(), bicInput.getText()), BankInfo.class);
+		AppSettings.setBoolean(BANK_INFO_ON_INVOICE, bankOnInvoiceCheckbox.isSelected());
+		AppSettings.setBoolean(EMAIL_ON_INVOICE,emailOnInvoiceCheckbox.isSelected());
+
+		AppSettings.setString(AppSettings.APP_DATA_DIRECTORY, appDataDirectoryInput.getText());
+		AppSettings.setInt(CURRENT_INVOICE_NUMBER, invoiceNumberInput.getValue()-1);
 		
 		try {
-			settings.setDefaultTax(AppUtils.parseDouble(defaultTaxInput.getText(), true));
+			AppSettings.setDouble(DEFAULT_TAX, AppUtils.parseDouble(defaultTaxInput.getText(), true));
 		} catch (ParseException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -100,10 +119,10 @@ public class AppSettingsController {
 	
 	public void handleSelectDirectoryButton() {
 		DirectoryChooser dirChooser = new DirectoryChooser();
-		dirChooser.setTitle("Speicherort f�r PDF-Rechnungen ausw�hlen");		
+		dirChooser.setTitle("Speicherort für PDF-Rechnungen auswählen");
 		File selectedDirectory = dirChooser.showDialog(AppWindow.stage);
 		if(selectedDirectory != null)
-			invoiceDirectoryInput.setText(selectedDirectory.getAbsolutePath());
+			appDataDirectoryInput.setText(selectedDirectory.getAbsolutePath());
 		
 	}
 }

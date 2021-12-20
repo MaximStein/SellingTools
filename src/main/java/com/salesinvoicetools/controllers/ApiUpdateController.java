@@ -35,6 +35,9 @@ public class ApiUpdateController {
     ProgressBar progressBar;
 
     @FXML
+    Button testButton;
+
+    @FXML
     CheckComboBox<Marketplace> apiPlatformSelect;
 
     public DoubleProperty currentProgress;
@@ -52,6 +55,16 @@ public class ApiUpdateController {
     }
 
     private void setUpApiContols() {
+
+        testButton.setOnAction(actionEvent -> {
+           getSelectedTokens().forEach(oAuth2Token -> {
+               var api = ShopApiBase.getTargetShopApi(oAuth2Token);
+               var order = api.getProduct("203633267889");
+
+               AppUtils.log(order == null ? "Product is null" : order.toString());
+           });
+        });
+
         apiPastDaysLabel.setUserData(apiPastDaysLabel.getText());
 
         apiPastXDaysSlider.valueProperty().addListener((a,o,newVal) -> {
@@ -73,8 +86,7 @@ public class ApiUpdateController {
         this.currentProgress = progressBar.progressProperty();
     }
 
-    public void updateRemoteOrders() {
-
+    private List<OAuth2Token> getSelectedTokens() {
         var selectedMps = apiPlatformSelect.getCheckModel().getCheckedItems();
 
         //var tokens = DataAccessBase.<OAuth2Token>getAll(OAuth2Token.class);
@@ -85,6 +97,13 @@ public class ApiUpdateController {
         AppUtils.log("Starting API-Update for following marketplaces: "+
                 String.join(",", selectedMps.stream()
                         .map(mp -> ""+mp).collect(Collectors.joining())));
+
+        return tokens;
+    }
+
+    public void updateRemoteOrders() {
+
+        var tokens = getSelectedTokens();
 
         tokens.stream().filter(t -> t.isActive()).forEach(t -> {
 

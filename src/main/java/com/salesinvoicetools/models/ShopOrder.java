@@ -1,10 +1,13 @@
 package com.salesinvoicetools.models;
 
-import com.salesinvoicetools.shopapis.EtsyShopApi;
+import com.google.api.client.util.Strings;
+import com.salesinvoicetools.shopapis.ShopApiBase;
+import com.salesinvoicetools.utils.AppUtils;
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import javax.persistence.CascadeType;
 import javax.persistence.Entity;
@@ -48,6 +51,8 @@ public class ShopOrder {
 
 	public long totalGrossAmount;
 
+	public long totalFees;
+
 	public long shippingCosts;
 
 	public String buyerCheckoutMessage;
@@ -63,13 +68,15 @@ public class ShopOrder {
 	@OneToMany(mappedBy = "owner", cascade = { CascadeType.ALL })
 	public List<LineItem> items = new ArrayList<>();
 
+	public String images;
+
 	@Override
 	public String toString() {
 		var str = "[ " + getMarketplaceString() + " Order from " + shippingAddress.getName() + " (" + buyer.getUserName()
 				+ ")]";
 		for (var item : items) {
-			str += "\r\n	" + item.getSingleItemAmount().doubleValue() + " " + currencyCode + "	"
-					+ item.getProduct().getDescription() + "	x" + item.getQuantity() + "\r\n";
+			str += "\r\n	" + item.getSingleItemAmountString() + " " + currencyCode + "	"
+					+ item.getProduct().getTitle() + "	x" + item.getQuantity() + "\r\n";
 		}
 		str += "	-----------------\r\n";
 		return str;
@@ -90,6 +97,45 @@ public class ShopOrder {
 	public String getMarketplaceString() {
 		return dataSource == null ? "-sonstige-" : dataSource.getToken().getOwner().platform.toString();
 	}
+
+	public ShopApiBase.Marketplace getMarketplace(){
+		return dataSource == null || dataSource.token == null ? null : dataSource.token.owner.platform;
+	}
+
+
+	public String[] getProductImages() {
+		var result = this.items.stream()
+				.filter(lineItem->lineItem.product != null && !Strings.isNullOrEmpty(lineItem.product.imageUrls))
+				.map(lineItem -> (String)lineItem.product.getImageUrls()[0])
+				.collect(Collectors.toList())		;
+		return result.toArray(String[]::new);
+	}
+
+	public String getItemsShortDescription(int maxItems) {
+
+		if(items == null || items.size() == 0) {
+			return "-keine Line Items-";
+		}
+
+		var str = "";
+		for(int i = 0; i<items.size() && i<maxItems; i++) {
+			var item = items.get(i);
+			if(item.product == null)
+				str+=item.quantity+"x"+AppUtils.formatCurrencyAmount(item.totalPriceGross);
+			else
+				str +=  item.quantity+"x "+ AppUtils.shortenString(item.product.title, 30, 10);
+			str += "\r\n";
+		}
+
+		if(items.size() > maxItems)
+			str+="+"+(items.size()-maxItems)+" weitere";
+
+		if(str.endsWith("\r\n"))
+			str = str.substring(0,str.length()-2);
+
+		return str;
+	}
+
 
 	public long getId() {
 		return id;
