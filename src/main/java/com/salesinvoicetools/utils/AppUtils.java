@@ -1,13 +1,17 @@
 package com.salesinvoicetools.utils;
 
 import com.google.api.client.repackaged.com.google.common.base.Strings;
+import com.google.api.client.util.DateTime;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.salesinvoicetools.controllers.AppController;
 import com.salesinvoicetools.dataaccess.AppSettings;
 import static com.salesinvoicetools.dataaccess.AppSettings.*;
 import com.salesinvoicetools.dataaccess.DataAccessBase;
 import com.salesinvoicetools.dataaccess.OrderDataAccess;
-import com.salesinvoicetools.models.Address;
-import com.salesinvoicetools.models.ShopOrder;
+import com.salesinvoicetools.models.*;
+import com.salesinvoicetools.shopapis.ShopApiBase;
+import com.salesinvoicetools.viewmodels.AppDataExport;
 import javafx.beans.property.DoubleProperty;
 import javafx.beans.property.IntegerProperty;
 import javafx.beans.property.ObjectProperty;
@@ -21,6 +25,8 @@ import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javafx.util.Duration;
 import javafx.util.converter.NumberStringConverter;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 import org.controlsfx.control.IndexedCheckModel;
 import org.controlsfx.control.Notifications;
 
@@ -33,6 +39,7 @@ import java.math.BigInteger;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -55,19 +62,21 @@ public class AppUtils {
 	private static ShopOrder find(long id ) {
 		return (ShopOrder) DataAccessBase.find(ShopOrder.class, id);
 	}
-	
+
+
 	
 	/**
 	 * generates invoices for the provided order-IDs in the saved output directory, shows a confirmation dialog
 	 * @param selectedShopOrderIds
 	 */
 	public static void generateOrderInvoices(Long[] selectedShopOrderIds) {
-		
+
+
 		if(selectedShopOrderIds.length > 1) {
 			Alert alert = new Alert(AlertType.CONFIRMATION);
 			alert.setContentText(
 					"PDFs für " + selectedShopOrderIds.length + " Bestellungen in Verzeichnis "
-					+ AppSettings.getAppConfig().getInvoiceDirectory()+" speichern?");
+					+ PDFUtils.getInvoiceDirectory()+" speichern?");
 			ButtonType okButton = new ButtonType("Ok", ButtonData.OK_DONE);
 			ButtonType cancelButton = new ButtonType("Abbrechen", ButtonData.CANCEL_CLOSE);
 			alert.getButtonTypes().setAll(okButton, cancelButton);
@@ -98,9 +107,7 @@ public class AppUtils {
 
 
 	public static long getOrGenerateInvoiceNumber(ShopOrder order) {
-		Integer invoiceNumber = AppSettings.getInt(CURRENT_INVOICE_NUMBER);
-		if(invoiceNumber == null)
-			invoiceNumber = 0;
+		Integer invoiceNumber = AppSettings.getInt(CURRENT_INVOICE_NUMBER,0);
 
 		if(order.getInvoice() == null) {
 			invoiceNumber++;
@@ -113,6 +120,89 @@ public class AppUtils {
 		return invoiceNumber;
 	}
 
+	public static Long parseCurrency(String str) throws ParseException {
+		var newStr = str.contains("€") ? str : str+"€";
+		var val = parseDouble(newStr.split("€",1)[0], true);
+		return (long)(val * 100l);
+	}
+
+	public static boolean importAppData(File file) throws IOException {
+		Gson gson = new Gson();
+		var appData = gson.fromJson(Files.readString(file.toPath()), AppDataExport.class);
+
+		appData.businessData.forEach((k, v) -> {
+			if(v == null || v.equals("null"))
+				return;
+			AppSettings.setString(k,v);
+		});
+
+		appData.apiAccessData.forEach(apiAccess -> {
+			ApiAccess api = (ApiAccess) DataAccessBase.find(ApiAccess.class, apiAccess.platform);
+
+			if(api == null)
+			{
+				AppSettings.insertOrUpdate(apiAccess);
+				return;
+			}
+
+			api.clientId = apiAccess.clientId;
+			api.clientSecret = apiAccess.clientSecret;
+			api.callbackUrl = apiAccess.callbackUrl;
+			api.customData = apiAccess.customData;
+
+			ApiAccess finalApi = api;
+			apiAccess.tokens.forEach(t -> {
+					var existingToken = finalApi.tokens.stream()
+							.filter(t1 -> t1.name.equals(t.name))
+							.findFirst().get();
+
+					if(existingToken == null){
+						finalApi.tokens.add(t);
+						AppSettings.insertOrUpdate(finalApi);
+						return;
+					}
+					existingToken.accessToken = t.accessToken;
+					existingToken.refreshToken = t.refreshToken;
+					existingToken.acessTokenExpirationTime = t.acessTokenExpirationTime;
+					existingToken.refreshTokenExpirationTime = t.refreshTokenExpirationTime;
+			});
+		});
+
+		return true;
+	}
+
+	public static void exportAppData() throws IOException {
+		ArrayList<String> keys = new ArrayList<>();
+
+		var businessDataKeys = new String[] {
+				INVOICE_ADDRESS, CURRENT_INVOICE_NUMBER, BANK_INFO, BANK_INFO_ON_INVOICE, KLEINUNTERNEHMER_INFO,
+				VAT_ID, DEFAULT_TAX, EMAIL_ON_INVOICE, INVOICE_ADDITIONAL_TEXT, CONTACT_INFO
+		};
+
+		var businessData = new HashMap<String, String>();
+
+		Arrays.stream(businessDataKeys).forEach(k -> {
+			businessData.put(k, AppSettings.getString(k));
+		});
+
+		var exportDataModel = new AppDataExport();
+		exportDataModel.businessData = businessData;
+		exportDataModel.apiAccessData = DataAccessBase.getAll(ApiAccess.class);
+
+		Gson gson = new GsonBuilder().excludeFieldsWithoutExposeAnnotation().create();
+		String json = gson.toJson(exportDataModel);
+
+		var targetDir = AppSettings.getString(APP_DATA_DIRECTORY, ".");
+		var fileName = (Timestamp.from(Instant.now())+"")
+				.replace(":", "")
+				.replace(" ","")
+				.replace(".","")+".json";
+
+		File file = new File(targetDir+File.separator+fileName);
+		AppUtils.log("schreibe Export nach "+file.getCanonicalPath());
+		FileUtils.writeStringToFile(file, json, Charset.defaultCharset());
+	}
+
 	/**
 	 * generates an invoice inside the user-defined output directory, showing an error alert if none is defined
 	 * @param orderId
@@ -120,13 +210,13 @@ public class AppUtils {
 	 */
 	public static Long generateOrderInvoice(long orderId) {
 		
-		var config = AppSettings.getAppConfig();
-		if(Strings.isNullOrEmpty(config.getInvoiceDirectory())) {
+
+		/*if(Strings.isNullOrEmpty(AppSettings.getString(APP_DATA_DIRECTORY))) {
 			Alert alert = new Alert(AlertType.ERROR);
 			alert.setContentText(
 					"Es wurde noch kein Zielverzeichnis für PDF-Dateien in den Einstellungen festgelegt");
 			alert.show();	
-		}
+		} */
 		
 		ShopOrder order = find(orderId);
 		if(order == null)
@@ -135,22 +225,24 @@ public class AppUtils {
 		//OrderDataAccess.getInvoiceNumber(order);
 		var invoiceNumber = AppUtils.getOrGenerateInvoiceNumber(order);
 
-		if (!PDFUtils.createInvoiceFile(order, config, invoiceNumber)) {			
+		if (!PDFUtils.createInvoiceFile(order, invoiceNumber)) {
 			if(order.getInvoice() == null)
-				config.setCurrentInvoiceNumber(config.getCurrentInvoiceNumber()-1);
+				AppSettings.setInt(AppSettings.CURRENT_INVOICE_NUMBER, (int) (invoiceNumber-1));
 			
 			var message = "Die Datei konnte nicht erstellt werden."
 					+ "\r\nBitte prüfen Sie die Schreibberechtigungen für das Zielverzeichnis:\r\n"
-					+ config.getInvoiceDirectory();
+					+ PDFUtils.getInvoiceDirectory();
 			new Alert(AlertType.ERROR, message).show();
 			return null;
 		} 
 		else {
 			OrderDataAccess.insertOrUpdateInvoiceData(order, invoiceNumber);
-			DataAccessBase.insertOrUpdate(config);
+
 			return invoiceNumber;
 		}		
 	}
+
+
 
 	/**
 	 * 
@@ -175,7 +267,10 @@ public class AppUtils {
 		return null;
 	}
 
-	public static String formatCurrencyAmount(long cents, String currencySymbol) {
+	public static String formatCurrencyAmount(Long cents, String currencySymbol) {
+		if(cents == null )
+			return null;
+
 		return String.format("%.2f", 1d*cents / 100)+" "+currencySymbol;
 	}
 	/**
@@ -183,7 +278,7 @@ public class AppUtils {
 	 * @param cents
 	 * @return the currency-formatted amount, e.g. 12,49 €
 	 */
-	public static String formatCurrencyAmount(long cents) {
+	public static String formatCurrencyAmount(Long cents) {
 		return formatCurrencyAmount(cents, "EUR");
 	}
 	
@@ -195,6 +290,7 @@ public class AppUtils {
 	public static String formatDateTime(Timestamp ts) {
 		return ts == null ? "" : new SimpleDateFormat("dd.MM.yyyy hh:mm").format(ts);
 	}
+
 
 	/**
 	 *
@@ -251,7 +347,7 @@ public class AppUtils {
 	 * @return double val for the provided str
 	 * @throws ParseException
 	 */
-	public static double parseDouble(String str, boolean emptyIsZero) throws ParseException {
+	public static Double parseDouble(String str, boolean emptyIsZero) throws ParseException {
 		
 		if(emptyIsZero && str.trim().length() == 0)
 			return 0d;
@@ -280,6 +376,12 @@ public class AppUtils {
 
 	public static String encodeBase64(String str) {
 		return Base64.getUrlEncoder().withoutPadding().encodeToString(str.getBytes(StandardCharsets.UTF_8));
+	}
+
+	public static String getFileFormat(String path) {
+		if(!path.contains("."))
+			return null;
+		return path.substring(path.lastIndexOf(".")+1);
 	}
 
 	public static String getFilePart(String path) {
@@ -367,7 +469,13 @@ public class AppUtils {
 		val.clearChecks();
 		if(current != null) {
 			 Arrays.stream(current.split(","))
-					.forEach(str -> val.check(Integer.parseInt(str)));
+					.forEach(str -> {
+						try {
+							val.check(Integer.parseInt(str));
+						}
+						catch(NumberFormatException e) {}
+
+					});
 		}
 
 		val.getCheckedIndices().addListener(new ListChangeListener<Integer>() {
@@ -467,18 +575,47 @@ public class AppUtils {
 		return resizedImage;
 	}
 
+	public static void deleteImageFromCache(String imageName, ImageSize imgSize) throws IOException {
+		var file = getCacheImageLocation(imageName, imgSize);
+		new File(file).delete();
+	}
+
+	public static String getCacheImageLocation(String file, ImageSize size) throws IOException {
+		var appDir = AppSettings.getString(APP_DATA_DIRECTORY, new File(".").getCanonicalPath())+"/";
+		var relativeFileName = file.startsWith(appDir) ? file.substring(appDir.length()) : file;
+		var cacheDir = new File(appDir+"/cache/"+size);
+		var convertedFileName = getCacheConvertedFileName(relativeFileName);
+
+		return cacheDir +File.separator+convertedFileName;
+	}
+
+	public static String getCacheConvertedFileName(String originalFile) {
+		return originalFile
+				.replace(File.separator, "--")
+				.replace(":","-")
+				.replace("/", "_");
+	}
+
+
+	public static BufferedImage readImageFile(String fileName) throws IOException {
+		var f = new File(fileName);
+		if(f.exists())
+			return ImageIO.read(f);
+		return null;
+	}
 
 	public enum ImageSize { SM, ORIGINAL }
 	public static BufferedImage getImageFromCache(String fileName, ImageSize size) throws IOException {
+		return readImageFile(getCacheImageLocation(fileName, size));
+	}
 
-		var convertedFileName = fileName.replace("/", ".").replace(":","__");
-		var cacheDir = AppSettings.getString(APP_DATA_DIRECTORY,".")+"/cache/"+size;
+	public static void cacheImage(String fileName, ImageSize size) throws IOException {
 
+		var cacheDir =  getCacheImageLocation(fileName, size);
 		BufferedImage bufferedImage = null;
 
-		if(!Files.exists(Path.of(cacheDir+"/"+convertedFileName))){
-			System.out.println(cacheDir+"/"+convertedFileName);
-			Files.createDirectories(Path.of(cacheDir));
+		if(!new File(cacheDir).exists()){
+			Files.createDirectories(Path.of(cacheDir.substring(0,cacheDir.lastIndexOf(File.separator))));
 
 			if(fileName.startsWith("http://") || fileName.startsWith("https://")) {
 				bufferedImage =  ImageIO.read(new URL(fileName));
@@ -487,13 +624,34 @@ public class AppUtils {
 				bufferedImage = ImageIO.read(new File(fileName));
 			}
 			else {
-				return null;
+				return;
 			}
 
-			ImageIO.write(AppUtils.resizeImage(bufferedImage,60,60), "jpg", new File(cacheDir + "/" + convertedFileName));
-
+			ImageIO.write(AppUtils.resizeImage(bufferedImage,60,60),
+					AppUtils.getFileFormat(fileName),
+					new File(cacheDir));
 		}
-		return ImageIO.read(new File(cacheDir+"/"+convertedFileName));
+	}
 
+	public static String mapToJson(Map<String,String> map) {
+		var ref = new Object() {
+			String str = "{";
+		};
+
+		map.forEach((o, o2) -> {
+			ref.str += "\""+o+"\":\""+o2+"\",";
+		});
+
+		if(ref.str.endsWith(","))
+			ref.str = ref.str.substring(0,ref.str.length()-1);
+
+		return ref.str+"}";
+
+	}
+
+	public static Map<String,String> jsonToMap(String str) {
+		Gson gson = new Gson();
+		Map map = gson.fromJson(str, Map.class);
+		return map;
 	}
 }

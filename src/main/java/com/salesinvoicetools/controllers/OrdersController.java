@@ -178,7 +178,7 @@ public class OrdersController {
 				var text = order.getMarketplaceString();
 
 				if (order.getDataSource() != null) {
-					text = order.getDataSource().getToken().getName() + "\r\n" + text + "";
+					text = order.getDataSource().token.name + "\r\n" + text + "";
 				}
 				return new SimpleStringProperty(text);
 			});
@@ -285,8 +285,7 @@ public class OrdersController {
 			actionCol.setCellFactory(
 				new Callback<TableColumn<ShopOrdersTableRow, Void>, TableCell<ShopOrdersTableRow, Void>>() {
 					@Override
-					public TableCell<ShopOrdersTableRow, Void> call(
-							final TableColumn<ShopOrdersTableRow, Void> param) {
+					public TableCell<ShopOrdersTableRow, Void> call(final TableColumn<ShopOrdersTableRow, Void> param) {
 
 						return new TableCell<ShopOrdersTableRow, Void>() {
 							private final Button removeButton = new Button();
@@ -339,7 +338,7 @@ public class OrdersController {
 			var allTokens = DataAccessBase.getAll(OAuth2Token.class).toArray(new OAuth2Token[0]);
 			var tokenSelectOptions = Stream.concat(
 					Arrays.<OAuth2Token>stream(allTokens)
-							.map(t -> new TokenSelectModel(t, t.getName() + " | " + t.getOwner().platform, false)),
+							.map(t -> new TokenSelectModel(t, t.name + " | " + t.owner.platform, false)),
 					Arrays.stream(
 							new TokenSelectModel[] { new TokenSelectModel(null, "( ohne / manuell angelegt )", false),
 							//		new TokenSelectModel(null, "( alle )", true)
@@ -361,6 +360,10 @@ public class OrdersController {
 
 			applyFilterValues();
 			updateSelectionInfoLabel();
+
+			dateCol.setSortType(TableColumn.SortType.DESCENDING);
+			ordersTable.getSortOrder().setAll(dateCol);
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -381,8 +384,6 @@ public class OrdersController {
 
 
 	private void updateOrdersView() {
-		AppUtils.log("updating orders view");
-
 		totalEntries = OrderDataAccess.count(filter);
 		
 		if(ordersPagination == null)
@@ -494,7 +495,7 @@ public class OrdersController {
 
 	public void handleTestButtonAction() {
 		var tokens = DataAccessBase.<OAuth2Token>getAll(OAuth2Token.class);
-		tokens.stream().filter(t -> t.isActive()).forEach(t -> {
+		tokens.stream().filter(t -> t.isActive).forEach(t -> {
 			EbayShopApi shopApi = (EbayShopApi)ShopApiBase.getTargetShopApi(t);
 
 			try {

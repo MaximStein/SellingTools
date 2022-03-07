@@ -17,7 +17,6 @@ import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
 import javafx.stage.WindowEvent;
-import com.salesinvoicetools.models.AppConfiguration;
 import com.salesinvoicetools.models.OAuth2Token;
 import com.salesinvoicetools.models.ShopOrder;
 
@@ -39,46 +38,17 @@ public class AppWindow extends Application {
 		    }
 		});
 		
-		Scene scene = new Scene(root, 1200, 900);
-		scene.getStylesheets().add(AppWindow.class.getResource("style.css").toExternalForm());
+		Scene scene = new Scene(root, 1600, 900);
+		scene.getStylesheets().add(AppWindow.class.getResource("css/style.css").toExternalForm());
 
 		primaryStage.setTitle("Rechnungstool");
 		primaryStage.setScene(scene);
 		primaryStage.show();
 
-		EtsyShopApi api = (EtsyShopApi) ShopApiBase.getTargetShopApi(DataAccessBase.getOneWhere(OAuth2Token.class, "name", "asdf"));
-
-		/*try {
-			if(api.refreshToken())
-				System.out.println("tokenrefrehed yo");
-			else
-				System.out.println("couldnt refresh token");
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		} catch (ExecutionException e) {
-			e.printStackTrace();
-		} */
-
-		//var res = api.getShopByUserId("242570917");
-		//var res= api.getShopReceipts(AppUtils.intantToCalendar(Instant.now().minusSeconds(30*24*36000)),0, 10, true);
-
-		var testProp = new SimpleIntegerProperty();
-		List<ShopOrder> res = null;
-		try {
-			//res = api.getOrdersPage(AppUtils.intantToCalendar(Instant.now().minusSeconds(30*24*36000)), 1, 10, testProp);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-
-		//var res= api.getShopReceipts("gravurshop");
 	}
 
 	public static void subMain(String[] args) {
-		
-		if(DataAccessBase.count(AppConfiguration.class) == 0) {
-			DataAccessBase.insertOrUpdate(new AppConfiguration());
-		}
-		
+
 		launch(args);		
 	}
 }

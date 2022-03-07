@@ -18,14 +18,12 @@ public class StockItemVariation {
 
     public String possibleValues;
 
-    @OneToOne
-    public StockItemStock stockAmount;
-
-    @OneToOne
-    public StockItemPrice price;
+    public List<String> getPossibleValuesList() {
+        return possibleValues == null ? new ArrayList<String>() : List.of(possibleValues.split(","));
+    }
 
     @ManyToOne
     @JoinColumn(name = "owner_id")
-    private StockItem owner;
+    public StockItem owner;
 
 }

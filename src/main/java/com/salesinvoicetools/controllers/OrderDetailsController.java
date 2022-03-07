@@ -307,7 +307,7 @@ public class OrderDetailsController {
 				"Testprodukt", 
 				"" + (new Random().nextInt()),
 				item.getOwner() == null || item.getOwner().getDataSource() == null ? null
-						: item.getOwner().getDataSource().getToken().getOwner().platform);
+						: item.getOwner().getDataSource().token.owner.platform);
 
 		item.setProduct(p);
 		item.setOwner(shopOrder);

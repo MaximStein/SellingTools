@@ -2,3 +2,6 @@
 /target/
 /app-db.mv.db
 /src/main/java/com/salesinvoicetools/Private.java
+/cache/
+/invoices/
+/product-images/

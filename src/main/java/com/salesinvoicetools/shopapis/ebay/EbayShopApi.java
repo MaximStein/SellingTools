@@ -46,9 +46,9 @@ public class EbayShopApi extends ShopApiBase {
 	protected OAuth20Service getOAuth2Service() {
 		var permissionString = "https://api.ebay.com/oauth/api_scope https://api.ebay.com/oauth/api_scope/sell.marketing.readonly https://api.ebay.com/oauth/api_scope/sell.marketing https://api.ebay.com/oauth/api_scope/sell.inventory.readonly https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account.readonly https://api.ebay.com/oauth/api_scope/sell.account https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly https://api.ebay.com/oauth/api_scope/sell.fulfillment https://api.ebay.com/oauth/api_scope/sell.analytics.readonly https://api.ebay.com/oauth/api_scope/sell.finances https://api.ebay.com/oauth/api_scope/sell.payment.dispute https://api.ebay.com/oauth/api_scope/commerce.identity.readonly";
 
-		final OAuth20Service service = new ServiceBuilder(token.getOwner().clientId)
-				.apiSecret(token.getOwner().clientSecret).defaultScope(permissionString)
-				.callback(token.getOwner().callbackUrl)
+		final OAuth20Service service = new ServiceBuilder(token.owner.clientId)
+				.apiSecret(token.owner.clientSecret).defaultScope(permissionString)
+				.callback(token.owner.callbackUrl)
 
 				.build(isSandbox ? EbaySandboxApi20.instance() : EbayApi20.instance());
 		return service;
@@ -138,7 +138,7 @@ public class EbayShopApi extends ShopApiBase {
 			product.grossPriceMin = product.grossPriceMax = Math.round(t.lineItemCost.value / t.quantity * 100);
 			product.title = t.title;
 
-			if(Strings.isNullOrEmpty(product.imageUrls)) {
+			if(product.imageUrls == null || Strings.isNullOrEmpty(product.imageUrls.trim())) {
 				var apiProduct = getProduct(t.legacyItemId);
 				if(apiProduct != null) {
 					product.imageUrls = apiProduct.imageUrls;
@@ -292,7 +292,7 @@ public class EbayShopApi extends ShopApiBase {
 			refreshToken();
 		}
 
-		http.setRequestProperty("Authorization", "Bearer " + token.getAccessToken());
+		http.setRequestProperty("Authorization", "Bearer " + token.accessToken);
 		http.setRequestProperty("Content-Language", "en-US");
 		http.setRequestMethod(method == null ? "GET" : method);
 		http.setDoOutput(true);
@@ -302,7 +302,6 @@ public class EbayShopApi extends ShopApiBase {
 			http.setRequestProperty("Content-Type", "application/json; utf-8");
 
 		http.connect();
-		System.out.println(method+ "|"+http.getRequestMethod());
 		
 		if (content != null) {
 			try (OutputStream os = http.getOutputStream()) {
@@ -319,7 +318,6 @@ public class EbayShopApi extends ShopApiBase {
 		   inputStream = http.getErrorStream();
 		}
 
-		System.out.println("[" + http.getResponseCode() + "]");
 		try {
 			String theString = IOUtils.toString(inputStream, "UTF-8");
 			return theString;

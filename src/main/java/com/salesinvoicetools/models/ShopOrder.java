@@ -95,7 +95,7 @@ public class ShopOrder {
 	}
 
 	public String getMarketplaceString() {
-		return dataSource == null ? "-sonstige-" : dataSource.getToken().getOwner().platform.toString();
+		return dataSource == null ? "-sonstige-" : dataSource.token.owner.platform.toString();
 	}
 
 	public ShopApiBase.Marketplace getMarketplace(){
@@ -114,7 +114,7 @@ public class ShopOrder {
 	public String getItemsShortDescription(int maxItems) {
 
 		if(items == null || items.size() == 0) {
-			return "-keine Line Items-";
+			return "-keine Positionen vorhanden-";
 		}
 
 		var str = "";
@@ -123,7 +123,7 @@ public class ShopOrder {
 			if(item.product == null)
 				str+=item.quantity+"x"+AppUtils.formatCurrencyAmount(item.totalPriceGross);
 			else
-				str +=  item.quantity+"x "+ AppUtils.shortenString(item.product.title, 30, 10);
+				str +=  item.quantity+"x "+ AppUtils.shortenString(item.product.title, 60, 60);
 			str += "\r\n";
 		}
 

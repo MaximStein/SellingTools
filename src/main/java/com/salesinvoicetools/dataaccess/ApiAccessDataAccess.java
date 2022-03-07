@@ -10,12 +10,12 @@ public class ApiAccessDataAccess extends DataAccessBase {
 		em.getTransaction().begin();
 		
 		DataAccessBase.getAll(DataSource.class).forEach(da -> {
-			if(da.getToken() == entry)
+			if(da.token == entry)
 				System.out.println("Removing DataSource "+da.id);
 				em.remove(da);
 			});
 
-		if(entry.getOwner().tokens.remove(entry)) {
+		if(entry.owner.tokens.remove(entry)) {
 			System.out.println("removed token "+entry.id+" from ApiAccess "+entry.owner.platform);
 		}
 		else {

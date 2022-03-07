@@ -7,42 +7,42 @@
 <?import javafx.scene.layout.BorderPane?>
 <?import javafx.scene.web.WebView?>
 
-<SplitPane dividerPositions="0.8303477344573235" orientation="VERTICAL" xmlns="http://javafx.com/javafx/15.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.salesinvoicetools.controllers.AppController">
+<SplitPane dividerPositions="0.8303477344573235" orientation="VERTICAL" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.salesinvoicetools.controllers.AppController">
     <items>
 
-                <TabPane fx:id="mainTabPane" tabClosingPolicy="UNAVAILABLE" tabMinWidth="100.0" BorderPane.alignment="CENTER">
-                    <tabs>
-                        <Tab fx:id="ordersTab" text="Bestellungen">
-                            <content>
-                                <AnchorPane fx:id="ordersPane">
-                                    <children>
-                                        <fx:include fx:id="ordersOverviewPage" source="OrdersOverviewPage.fxml" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
-                                    </children>
-                                </AnchorPane>
-                            </content>
-                        </Tab>
-            <Tab text="Lagerbestand">
-              <content>
-                <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0" />
-              </content>
-            </Tab>
-                        <Tab fx:id="apiTab" text="Access Tokens">
-                            <content>
-                                <fx:include fx:id="apiAccessPage" source="ApiAccessPage.fxml" />
-                            </content>
-                        </Tab>
-                        <Tab fx:id="settingsTab" text="Einstellungen">
-                            <content>
-                                <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
-                                    <children>
-                                        <fx:include fx:id="appSettingsPage" source="AppSettingsForm.fxml" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
-                                    </children>
-                                </AnchorPane>
-                            </content>
-                        </Tab>
-                    </tabs>
-                </TabPane>
+        <TabPane fx:id="mainTabPane" tabClosingPolicy="UNAVAILABLE" tabMinWidth="100.0" BorderPane.alignment="CENTER">
+            <tabs>
+                <Tab fx:id="ordersTab" text="Bestellungen">
+                    <content>
+                        <AnchorPane fx:id="ordersPane">
+                            <children>
+                                <fx:include fx:id="ordersOverviewPage" source="OrdersOverviewPage.fxml" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
+                            </children>
+                        </AnchorPane>
+                    </content>
+                </Tab>
+                <Tab fx:id="stockTab" text="Produkte">
+                    <content>
+                        <fx:include fx:id="stockItemsPage" source="StockItemsPage.fxml" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
+                    </content>
+                </Tab>
+                <Tab fx:id="apiTab" text="Access Tokens">
+                    <content>
+                        <fx:include fx:id="apiAccessPage" source="ApiAccessPage.fxml" />
+                    </content>
+                </Tab>
+                <Tab fx:id="settingsTab" text="Einstellungen">
+                    <content>
+                        <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                            <children>
+                                <fx:include fx:id="appSettingsPage" source="AppSettingsForm.fxml" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0" />
+                            </children>
+                        </AnchorPane>
+                    </content>
+                </Tab>
+            </tabs>
+        </TabPane>
 
-                <WebView fx:id="logWebView" prefHeight="200.0" prefWidth="-1.0" BorderPane.alignment="CENTER" />
+        <WebView fx:id="logWebView" prefHeight="200.0" prefWidth="-1.0" BorderPane.alignment="CENTER" />
     </items>
 </SplitPane>

@@ -65,7 +65,7 @@ public class EtsyShopApi extends ShopApiBase {
 	public boolean refreshToken() throws IOException, InterruptedException, ExecutionException {
 
 		var params = "grant_type=refresh_token&client_id="
-				+token.getOwner().clientSecret+"&refresh_token="+token.refreshToken;
+				+token.owner.clientSecret+"&refresh_token="+token.refreshToken;
 
 		var conn = NetUtils.openHttpURLConnection(EtsyApi20.instance().getAccessTokenEndpoint(),  "POST", params,null,"application/x-www-form-urlencoded" );
 		var response = NetUtils.getHttpConnectionContent(conn);
@@ -76,10 +76,7 @@ public class EtsyShopApi extends ShopApiBase {
 
 		token.refreshToken = accessTokenResponse.refresh_token;
 		token.accessToken = accessTokenResponse.access_token;
-		token.setAcessTokenExpirationTime(
-				Date.from(
-						Instant.now().plusSeconds(accessTokenResponse.expires_in)));
-
+		token.acessTokenExpirationTime = Date.from(Instant.now().plusSeconds(accessTokenResponse.expires_in));
 		DataAccessBase.insertOrUpdate(token);
 		return true;
 	}
@@ -88,8 +85,8 @@ public class EtsyShopApi extends ShopApiBase {
 	protected OAuth20Service getOAuth2Service() {
 		var permissionString = "listings_r address_r profile_r shops_r transactions_r email_r";
 
-		final OAuth20Service service = new ServiceBuilder(token.getOwner().clientId)
-				.apiSecret(token.getOwner().clientSecret)
+		final OAuth20Service service = new ServiceBuilder(token.owner.clientId)
+				.apiSecret(token.owner.clientSecret)
 				.defaultScope(permissionString)
 				.callback("https://localhost")
 				//.callback(token.getOwner().getCallbackUrl())
@@ -223,7 +220,7 @@ public class EtsyShopApi extends ShopApiBase {
 		UnicodeEscaper basicEscaper = new PercentEscaper("-", false);
 		//String s = basicEscaper.escape(params);
 		var params = "grant_type=authorization_code&client_id="
-				+token.getOwner().clientId+"&redirect_uri="
+				+token.owner.clientId+"&redirect_uri="
 				+basicEscaper.escape("https://localhost")
 				+"&code="+accessCode+"&code_verifier="+CODE_VERIFIER;
 
@@ -235,11 +232,9 @@ public class EtsyShopApi extends ShopApiBase {
 		if(conn.getResponseCode() != 200 || Strings.isNullOrEmpty(accessTokenResponse.access_token))
 			return false;
 
-		token.setAccessToken(accessTokenResponse.access_token);
-		token.setRefreshToken(accessTokenResponse.refresh_token);
-		token.setAcessTokenExpirationTime(Date
-				.from(Instant.now().plusSeconds(accessTokenResponse.expires_in))
-		);
+		token.accessToken = accessTokenResponse.access_token;
+		token.refreshToken = accessTokenResponse.refresh_token;
+		token.acessTokenExpirationTime = Date.from(Instant.now().plusSeconds(accessTokenResponse.expires_in));
 
 		return true;
 	}

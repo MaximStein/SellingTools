@@ -2,7 +2,6 @@ package com.salesinvoicetools.viewmodels;
 
 import com.salesinvoicetools.models.ShopOrder;
 import com.salesinvoicetools.models.StockItem;
-import com.salesinvoicetools.models.StockItemStock;
 import javafx.beans.property.SimpleBooleanProperty;
 
 public class StockItemTableRow {

@@ -6,15 +6,17 @@ import javax.persistence.Id;
 @Entity
 public class AppSetting {
 
-    @Id
-    public String key;
 
-    public String value;
+    @Id
+    public String identifier;
+
+    public String val;
+
 
     public AppSetting() {}
 
     public AppSetting(String key, String value) {
-        this.key = key;
-        this.value = value;
+        this.identifier = key;
+        this.val = value;
     }
 }

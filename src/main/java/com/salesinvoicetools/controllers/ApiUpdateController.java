@@ -56,15 +56,6 @@ public class ApiUpdateController {
 
     private void setUpApiContols() {
 
-        testButton.setOnAction(actionEvent -> {
-           getSelectedTokens().forEach(oAuth2Token -> {
-               var api = ShopApiBase.getTargetShopApi(oAuth2Token);
-               var order = api.getProduct("203633267889");
-
-               AppUtils.log(order == null ? "Product is null" : order.toString());
-           });
-        });
-
         apiPastDaysLabel.setUserData(apiPastDaysLabel.getText());
 
         apiPastXDaysSlider.valueProperty().addListener((a,o,newVal) -> {
@@ -105,7 +96,7 @@ public class ApiUpdateController {
 
         var tokens = getSelectedTokens();
 
-        tokens.stream().filter(t -> t.isActive()).forEach(t -> {
+        tokens.stream().filter(t -> t.isActive).forEach(t -> {
 
             currentMarketplaceProcessing = t.owner.platform;
 

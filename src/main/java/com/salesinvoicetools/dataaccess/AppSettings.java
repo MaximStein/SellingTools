@@ -2,7 +2,6 @@ package com.salesinvoicetools.dataaccess;
 
 import com.google.api.client.util.Strings;
 import com.google.gson.Gson;
-import com.salesinvoicetools.models.AppConfiguration;
 import com.salesinvoicetools.models.AppSetting;
 
 public abstract class AppSettings extends DataAccessBase {
@@ -35,11 +34,6 @@ public abstract class AppSettings extends DataAccessBase {
 		return gson.fromJson(AppSettings.getString(key), type);
 	}
 
-	public static AppConfiguration getAppConfig() {
-		AppConfiguration settings = DataAccessBase.getAll(AppConfiguration.class)
-				.get(0);		
-		return settings;
-	}
 
 	public static void setDouble(String key, Double val) {
 		setString(key, val.toString());
@@ -91,7 +85,7 @@ public abstract class AppSettings extends DataAccessBase {
 		AppSetting setting = (AppSetting) DataAccessBase.find(AppSetting.class, key);
 		if(setting == null)
 			setting = new AppSetting(key, val);
-		setting.value = val;
+		setting.val = val;
 		DataAccessBase.insertOrUpdate(setting);
 	}
 
@@ -101,6 +95,6 @@ public abstract class AppSettings extends DataAccessBase {
 
 	public static String getString(String key) {
 		AppSetting setting = (AppSetting) DataAccessBase.find(AppSetting.class, key);
-		return setting == null ? null : setting.value;
+		return setting == null ? null : setting.val;
 	}
 }

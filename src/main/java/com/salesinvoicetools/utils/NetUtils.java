@@ -1,6 +1,5 @@
 package com.salesinvoicetools.utils;
 
-import com.salesinvoicetools.Private;
 import org.apache.commons.io.IOUtils;
 
 import java.io.IOException;

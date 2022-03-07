@@ -6,17 +6,24 @@ import com.salesinvoicetools.dataaccess.AppSettings;
 import static com.salesinvoicetools.dataaccess.AppSettings.*;
 import com.salesinvoicetools.dataaccess.DataAccessBase;
 import com.salesinvoicetools.models.Address;
-import com.salesinvoicetools.models.AppConfiguration;
 import com.salesinvoicetools.models.BankInfo;
 import com.salesinvoicetools.utils.AppUtils;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
+import javafx.scene.layout.VBox;
 import javafx.stage.DirectoryChooser;
+import javafx.stage.FileChooser;
+import net.synedra.validatorfx.Check;
 
 import java.io.File;
+import java.io.IOException;
 import java.text.ParseException;
 
 public class AppSettingsController {
+
+
+	@FXML
+	VBox container;
 
 	@FXML
 	AddressController addressController;
@@ -53,14 +60,22 @@ public class AppSettingsController {
 
 	@FXML 
 	Spinner<Integer> invoiceNumberInput;
-	
-	private AppConfiguration settings;
+
+	@FXML
+	CheckBox exportBusinessSettingsCheckbox;
+
+	@FXML
+	CheckBox exportApiDataCheckbox;
+
+	@FXML
+	Button exportDataButton;
+
 
 	public void initialize() {
 
 		defaultTaxInput.setTextFormatter(new TextFormatter<>(AppUtils.numberStringConverter));
 
-		settings = (AppConfiguration) DataAccessBase.getAll(AppConfiguration.class).get(0);
+		//settings = (AppConfiguration) DataAccessBase.getAll(AppConfiguration.class).get(0);
 
 		addressController.setAddress(AppSettings.get(INVOICE_ADDRESS, Address.class));
 
@@ -87,8 +102,10 @@ public class AppSettingsController {
 		
 		invoiceNumberInput.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(
 				1,
-				Integer.MAX_VALUE,
+				java.lang.Integer.MAX_VALUE,
 				AppSettings.getInt(CURRENT_INVOICE_NUMBER, 1)+1));
+
+		exportDataButton.setOnAction(actionEvent -> handleDataExportButton());
 
 	}
 
@@ -113,10 +130,17 @@ public class AppSettingsController {
 			e.printStackTrace();
 		}
 
-		DataAccessBase.insertOrUpdate(settings);
 		initialize();
 	}
-	
+
+	public void handleDataExportButton() {
+		try {
+			AppUtils.exportAppData();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
 	public void handleSelectDirectoryButton() {
 		DirectoryChooser dirChooser = new DirectoryChooser();
 		dirChooser.setTitle("Speicherort für PDF-Rechnungen auswählen");

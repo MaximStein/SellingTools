@@ -87,9 +87,9 @@ public class FakeEbayShopApi extends ShopApiBase {
 	protected OAuth20Service getOAuth2Service() {
 		var permissionString = "https://api.ebay.com/oauth/api_scope https://api.ebay.com/oauth/api_scope/sell.marketing.readonly https://api.ebay.com/oauth/api_scope/sell.marketing https://api.ebay.com/oauth/api_scope/sell.inventory.readonly https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account.readonly https://api.ebay.com/oauth/api_scope/sell.account https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly https://api.ebay.com/oauth/api_scope/sell.fulfillment https://api.ebay.com/oauth/api_scope/sell.analytics.readonly https://api.ebay.com/oauth/api_scope/sell.finances https://api.ebay.com/oauth/api_scope/sell.payment.dispute https://api.ebay.com/oauth/api_scope/commerce.identity.readonly";
 
-		final OAuth20Service service = new ServiceBuilder(token.getOwner().clientId)
-				.apiSecret(token.getOwner().clientSecret).defaultScope(permissionString)
-				.callback(token.getOwner().callbackUrl)
+		final OAuth20Service service = new ServiceBuilder(token.owner.clientId)
+				.apiSecret(token.owner.clientSecret).defaultScope(permissionString)
+				.callback(token.owner.callbackUrl)
 				.build(isSandbox ? EbaySandboxApi20.instance() : EbayApi20.instance());
 		return service;
 	}

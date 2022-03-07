@@ -55,8 +55,8 @@ public class OrderDataAccess extends DataAccessBase {
 	public static ShopOrder getByOrderNumber(String orderNumber, Marketplace p) {
 		var orders = DataAccessBase.getWhere(ShopOrder.class, "orderNumber", orderNumber);
 		orders = orders.stream()
-				.filter(o -> (p == null && (o.getDataSource() == null || o.getDataSource().getToken() == null))
-						|| (o.getDataSource() != null && o.getDataSource().getToken().getOwner().platform == p))
+				.filter(o -> (p == null && (o.getDataSource() == null || o.getDataSource().token == null))
+						|| (o.getDataSource() != null && o.getDataSource().token.owner.platform == p))
 				.collect(Collectors.toList());
 		return orders.size() == 0 ? null : orders.get(0);
 	}

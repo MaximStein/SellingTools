@@ -58,7 +58,7 @@ public abstract class ShopApiBase {
 
 		timeFrom.add(Calendar.DAY_OF_YEAR, -pastDaysMax);
 
-		update.setTime(Timestamp.from(Instant.now()));
+		update.time = Timestamp.from(Instant.now());
 		final var upd = update;
 
 		var pageNumber = 1;
@@ -72,7 +72,7 @@ public abstract class ShopApiBase {
 				ordersPage.forEach(o -> {
 					o.setDataSource(upd);
 
-					var existing = OrderDataAccess.getByOrderNumber(o.getOrderNumber(), token.getOwner().platform);
+					var existing = OrderDataAccess.getByOrderNumber(o.getOrderNumber(), token.owner.platform);
 					AppUtils.log(existing == null ? "Inserting "+o.getMarketplaceString()+"-order "+o.orderNumber : "order "+o.orderNumber+" already in DB");
 
 					if (existing == null) {
@@ -94,7 +94,7 @@ public abstract class ShopApiBase {
 
 			} while (remainingEntries.get() > 0 && ordersProcessed < 10000);
 
-			upd.setNewEntries(ordersProcessed);
+			upd.newEntries = ordersProcessed;
 			Platform.runLater(() -> {
 				DataAccessBase.insertOrUpdate(upd);
 				DataUpdateDataAccess.removeUnusedUpdates(token);
@@ -115,7 +115,7 @@ public abstract class ShopApiBase {
 	 * @return the api-implementation for the provided token, extending from this class
 	 */
 	public static ShopApiBase getTargetShopApi(OAuth2Token token) {
-		switch (token.getOwner().platform) {
+		switch (token.owner.platform) {
 			case ETSY:
 				return new EtsyShopApi(token);
 			case EBAY:
@@ -137,15 +137,15 @@ public abstract class ShopApiBase {
 	 */
 	public boolean refreshToken() throws IOException, InterruptedException, ExecutionException {		
 		var service = getOAuth2Service();		
-		var scribeJavaToken = service.refreshAccessToken(token.getRefreshToken());				
-		token.setAccessToken(scribeJavaToken.getAccessToken());
+		var scribeJavaToken = service.refreshAccessToken(token.refreshToken);
+		token.accessToken = scribeJavaToken.getAccessToken();
 		
 		if(scribeJavaToken.getRefreshToken() != null &&  !scribeJavaToken.getRefreshToken().isBlank())
-			token.setRefreshToken(scribeJavaToken.getRefreshToken());
-		token.setAcessTokenExpirationTime(
+			token.refreshToken = scribeJavaToken.getRefreshToken();
+		token.acessTokenExpirationTime =
 				Date.from(
-						Instant.now().plusSeconds(scribeJavaToken.getExpiresIn())));
-		
+						Instant.now().plusSeconds(scribeJavaToken.getExpiresIn()));
+
 		DataAccessBase.insertOrUpdate(token);
 		
 		return true;
@@ -157,7 +157,7 @@ public abstract class ShopApiBase {
 	 * @return
 	 */
 	public boolean isTokenExpired() {		
-		return token.getAcessTokenExpirationTime() == null || Date.from(Instant.now()).after(token.getAcessTokenExpirationTime());
+		return token.acessTokenExpirationTime == null || Date.from(Instant.now()).after(token.acessTokenExpirationTime);
 	}
 	
 	
@@ -186,13 +186,11 @@ public abstract class ShopApiBase {
 		if(accessToken == null)
 			return false;
 
-		token.setAccessToken(accessToken.getAccessToken());
-		token.setRefreshToken(accessToken.getRefreshToken());
-		token.setAcessTokenExpirationTime(Date
-				.from(Instant.now().plusSeconds(accessToken.getExpiresIn()))
-			);
+		token.accessToken = accessToken.getAccessToken();
+		token.refreshToken = accessToken.getRefreshToken();
+		token.acessTokenExpirationTime = Date.from(Instant.now().plusSeconds(accessToken.getExpiresIn()));
 				
-		DataAccessBase.insertOrUpdate(token.getOwner());
+		DataAccessBase.insertOrUpdate(token.owner);
 		
 		return true;					
 	}

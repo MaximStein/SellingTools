@@ -4,23 +4,24 @@
 <?import javafx.scene.control.Button?>
 <?import javafx.scene.control.Label?>
 <?import javafx.scene.control.ProgressBar?>
+<?import javafx.scene.control.Separator?>
 <?import javafx.scene.control.Slider?>
 <?import javafx.scene.layout.VBox?>
 <?import org.controlsfx.control.CheckComboBox?>
 
-<VBox alignment="CENTER" spacing="10.0" xmlns="http://javafx.com/javafx/15.0.1" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.salesinvoicetools.controllers.ApiUpdateController">
+<VBox alignment="CENTER" spacing="10.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.salesinvoicetools.controllers.ApiUpdateController">
    <children>
+      <CheckComboBox fx:id="apiPlatformSelect" prefWidth="180.0" />
+      <Separator prefWidth="200.0" />
+      <Slider fx:id="apiPastXDaysSlider" max="120.0" value="30.0" />
+      <Label fx:id="apiPastDaysLabel" text="letzte {x} Tage" />
+      <ProgressBar fx:id="progressBar" prefWidth="180.0" progress="0.0" VBox.vgrow="ALWAYS" />
       <Button fx:id="apiUpdateButton" alignment="CENTER" mnemonicParsing="false" onAction="#handleApiUpdateButton" prefWidth="180.0" text="neue abrufen (API)">
          <VBox.margin>
             <Insets />
          </VBox.margin>
       </Button>
-      <Slider fx:id="apiPastXDaysSlider" max="120.0" value="30.0" />
-      <Label fx:id="apiPastDaysLabel" text="letzte {x} Tage" />
-      <CheckComboBox fx:id="apiPlatformSelect" prefWidth="180.0" />
-      <ProgressBar fx:id="progressBar" prefWidth="180.0" progress="0.0" VBox.vgrow="ALWAYS" />
       <Label fx:id="statusLabel" />
-      <Button fx:id="testButton" mnemonicParsing="false" text="test" />
    </children>
    <padding>
       <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />

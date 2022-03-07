@@ -20,6 +20,7 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.web.WebView;
 import javafx.stage.Modality;
@@ -35,6 +36,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 public class ApiAccessController {
+
+
 
 	@FXML
 	Button saveApiAccessButton;
@@ -123,7 +126,7 @@ public class ApiAccessController {
 							} else if (newVal.getValue() instanceof OAuth2Token) {
 								var item = (OAuth2Token) newVal.getValue();
 
-								apiEntryActiveCheckbox.setSelected(item.isActive());
+								apiEntryActiveCheckbox.setSelected(item.isActive);
 								apiEntryActiveCheckbox.setDisable(false);
 
 								firstEditingField.setDisable(false);
@@ -147,36 +150,39 @@ public class ApiAccessController {
 					Boolean old_val, Boolean new_val) -> {
 						var selectedValue = apiAccessTreeView.getSelectionModel().getSelectedItem().getValue();
 						if(selectedValue instanceof OAuth2Token) {
-							((OAuth2Token)selectedValue).setActive(new_val);
+							((OAuth2Token)selectedValue).isActive = new_val;
 							DataAccessBase.insertOrUpdate(selectedValue);
 						}
 					});			
 		}
 
-		saveButton.setOnAction(actionEvent -> {
-			AppUtils.log(getSelectedItem() == null ? " - ": getSelectedItem().toString());
-			var item = getSelectedItem();
+		if(saveButton != null) {
+			saveButton.setOnAction(actionEvent -> {
+				AppUtils.log(getSelectedItem() == null ? " - ": getSelectedItem().toString());
+				var item = getSelectedItem();
 
-			if(item instanceof OAuth2Token ) {
-				var i = (OAuth2Token)item;
-				i.name = firstEditingField.getText();
-				DataAccessBase.insertOrUpdate(item);
+				if(item instanceof OAuth2Token ) {
+					var i = (OAuth2Token)item;
+					i.name = firstEditingField.getText();
+					DataAccessBase.insertOrUpdate(item);
 
-				var settingsKey = AppSettings.TOKEN_COLOR_+i.owner.platform+"_"+i.name;
-				var clr = AppSettings.getString(settingsKey, "#EEEEEE");
+					var settingsKey = AppSettings.TOKEN_COLOR_+i.owner.platform+"_"+i.name;
+					var clr = AppSettings.getString(settingsKey, "#EEEEEE");
 
-				AppSettings.setString(settingsKey,AppUtils.toRGBCode(tokenColorPicker.getValue()));
-			}
-			else if(item instanceof ApiAccess ) {
-				((ApiAccess)item).clientId = firstEditingField.getText();
-				((ApiAccess)item).clientSecret = secondEditingField.getText();
-				((ApiAccess)item).callbackUrl = editingField3.getText();
+					AppSettings.setString(settingsKey,AppUtils.toRGBCode(tokenColorPicker.getValue()));
+				}
+				else if(item instanceof ApiAccess ) {
+					((ApiAccess)item).clientId = firstEditingField.getText();
+					((ApiAccess)item).clientSecret = secondEditingField.getText();
+					((ApiAccess)item).callbackUrl = editingField3.getText();
 
 
 
-				DataAccessBase.insertOrUpdate(item);
-			}
-		});
+					DataAccessBase.insertOrUpdate(item);
+				}
+			});
+		}
+
 	}
 
 	public Object getSelectedItem() {
@@ -247,9 +253,9 @@ public class ApiAccessController {
 		
 		if(item.getValue() instanceof OAuth2Token) {
 			var token = (OAuth2Token) item.getValue();
-			token.getOwner().tokens.remove(token);
+			token.owner.tokens.remove(token);
 			ApiAccessDataAccess.deleteToken(token);
-			DataAccessBase.insertOrUpdate(token.getOwner());
+			DataAccessBase.insertOrUpdate(token.owner);
 		}
 		else if(item.getValue() instanceof ApiAccess)
 			DataAccessBase.delete(item.getValue());
@@ -293,7 +299,7 @@ public class ApiAccessController {
 			else 
 			{			
 				var input = result.get();
-				if(DataAccessBase.<OAuth2Token>getAll(OAuth2Token.class).stream().anyMatch(t -> t.getName().equals(input)))
+				if(DataAccessBase.<OAuth2Token>getAll(OAuth2Token.class).stream().anyMatch(t -> t.name.equals(input)))
 				{
 					headerMessage = "Eintrag mit dieser Bezeichnung existiert bereits.";
 					continue;
@@ -305,7 +311,7 @@ public class ApiAccessController {
 				
 		OAuth2Token token = new OAuth2Token();
 		token.owner = api;
-		token.setName(result.orElse("Neuer Token"));
+		token.name = result.orElse("Neuer Token");
 
 		ShopApiBase shopApi = ShopApiBase.getTargetShopApi(token);
 
@@ -342,7 +348,7 @@ public class ApiAccessController {
 					}
 
 					if(shopApi.tradeAccessTokenForCode(URLDecoder.decode(code, "UTF-8"))) {
-						token.setOwner(api);
+						token.owner = api;
 						api.tokens.add(token);
 
 						DataAccessBase.insertOrUpdate(api);

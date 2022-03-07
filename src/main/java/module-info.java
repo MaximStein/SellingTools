@@ -39,6 +39,7 @@ module com.salesinvoicetools.salesinvoicetools {
     opens com.salesinvoicetools.shopapis;
 
     exports com.salesinvoicetools;
+    exports com.salesinvoicetools.viewmodels;
     exports com.salesinvoicetools.models;
     exports com.salesinvoicetools.controllers;
     exports  com.salesinvoicetools.dataaccess.models;

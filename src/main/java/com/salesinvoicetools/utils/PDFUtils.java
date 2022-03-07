@@ -1,6 +1,7 @@
 package com.salesinvoicetools.utils;
 
 import java.awt.Color;
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.Timestamp;
@@ -85,6 +86,24 @@ public class PDFUtils {
 
             return returnVal;
 
+    }
+
+
+    public static String getInvoiceDirectory() {
+        var appDir =AppSettings.getString(AppSettings.APP_DATA_DIRECTORY, ".");
+        var f = new File(appDir == null ? "." : appDir+"/invoices");
+
+        try {
+            if(!f.exists())
+                f.mkdirs();
+
+            return f.getCanonicalPath();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return null;
     }
 
     private static void writeOrderInvoice(PdfWriter writer, ShopOrder order, long invoiceNumber) {
@@ -211,9 +230,11 @@ public class PDFUtils {
         ct = new ColumnText(writer.getDirectContent());
         var middleBottomStr = "";
         var bankInfo = AppSettings.get(AppSettings.BANK_INFO, BankInfo.class);
-        if(AppSettings.getBoolean(AppSettings.BANK_INFO_ON_INVOICE) && bankInfo != null)
+        if(AppSettings.getBoolean(AppSettings.BANK_INFO_ON_INVOICE, false) && bankInfo != null)
             middleBottomStr += bankInfo.toString();
-        middleBottomStr += "\r\nUst.-Id.: "+AppSettings.getString(AppSettings.VAT_ID);
+
+        var vat = AppSettings.getString(AppSettings.VAT_ID);
+        middleBottomStr += vat == null ? "" : "\r\nUst.-Id.: "+vat;
         ct.setSimpleColumn(xMargin + 155, 0, 1000, bottomSectionY);
         ct.addText(new Paragraph(middleBottomStr, footerFont));
         ct.go();
@@ -232,16 +253,15 @@ public class PDFUtils {
 	 * generated an invoice in the output directory that was specified inside the AppConfiguration object provided
 	 * does >not< update the invoice number of the order or the settings object 
 	 * @param order the ShopOrder for the invoice
-	 * @param settings the AppConfiguration object 
 	 * @param invoiceNumber the invoice number on the order
 	 * @return true if successful, otherwise false
 	 */
-	public static boolean createInvoiceFile(ShopOrder order, AppConfiguration settings, long invoiceNumber) {
+	public static boolean createInvoiceFile(ShopOrder order, long invoiceNumber) {
 		
 		var returnVal = true;
 		Document document = new Document(PageSize.A4);
         try {          
-        	var directory = Strings.isNullOrEmpty(settings.getInvoiceDirectory()) ? "./"+invoiceNumber+".pdf" : settings.getInvoiceDirectory()+"/"+invoiceNumber+".pdf"; 
+        	var directory = Strings.isNullOrEmpty(getInvoiceDirectory()) ? "./"+invoiceNumber+".pdf" : getInvoiceDirectory()+"/"+invoiceNumber+".pdf";
             var writer = PdfWriter.getInstance(document, new FileOutputStream(directory));
             document.open();
 
